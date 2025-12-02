@@ -42,20 +42,6 @@ func All[OUT any](ctx context.Context, stream Stream[OUT]) iter.Seq[*Result[OUT]
 	}
 }
 
-type Streamer[OUT any] func(context.Context) <-chan *Result[OUT]
-
-func (s Streamer[OUT]) Emit(ctx context.Context) <-chan *Result[OUT] {
-	return s(ctx)
-}
-
-func (s Streamer[OUT]) Collect(ctx context.Context) []*Result[OUT] {
-	return Collect(ctx, s)
-}
-
-func (s Streamer[OUT]) All(ctx context.Context) iter.Seq[*Result[OUT]] {
-	return All(ctx, s)
-}
-
 // Transformer represents a data processing unit that transforms
 // a Stream of type IN into a Stream of type OUT. Transformers can
 // be composed to build complex data processing pipelines.

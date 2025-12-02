@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-// Teminal functions are basically sinks that consume the stream data
-// and produce a final result, such as a slice of values, the first value,
-// or just run the stream for its side effects.
+// Terminal functions are sinks that consume stream data and produce
+// a final result, such as a slice of values, the first value, or just
+// run the stream for its side effects.
 
 func Slice[OUT any](ctx context.Context, in Stream[OUT]) ([]OUT, error) {
 	// Create a cancellable context to ensure we can stop processing

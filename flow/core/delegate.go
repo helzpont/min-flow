@@ -80,7 +80,7 @@ func (r *Registry) Register(d Delegate) error {
 	key := typeKey(d)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.items[key]; !exists {
+	if _, exists := r.items[key]; exists {
 		return fmt.Errorf("delegate with key %s already registered", key)
 	}
 	r.items[key] = d
@@ -133,4 +133,14 @@ func GetConfig[C Config](ctx context.Context) (C, bool) {
 	}
 	config, ok := registry.Get(typeKey(zero)).(C)
 	return config, ok
+}
+
+func GetPool[P Pool[T], T any](ctx context.Context) (P, bool) {
+	var zero P
+	registry, ok := ctx.Value(registryKey{}).(*Registry)
+	if !ok {
+		return zero, false
+	}
+	pool, ok := registry.Get(typeKey(zero)).(P)
+	return pool, ok
 }

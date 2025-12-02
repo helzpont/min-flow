@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // Mapper defines a function that maps a Result of type IN to a Result of type OUT. It represents a transformation
 // that maintains the cardinality of the flow (one input item produces one output item).
@@ -25,6 +28,32 @@ func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) Mapper[IN, OUT] {
 		}
 		return Ok(mappedValue), nil
 	}
+}
+
+func (m Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+	return Emit(func(ctx context.Context) <-chan *Result[OUT] {
+		outChan := make(chan *Result[OUT])
+		go func() {
+			defer close(outChan)
+			for resIn := range s.Emit(ctx) {
+				resOut, err := m(resIn)
+				if err != nil {
+					select {
+					case <-ctx.Done():
+						return
+					case outChan <- Err[OUT](err):
+					}
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case outChan <- resOut:
+				}
+			}
+		}()
+		return outChan
+	})
 }
 
 // FlatMapper defines a function that maps a Result of type IN to a Result containing a slice of Results of type OUT.
@@ -54,4 +83,32 @@ func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) FlatMapper[IN, OU
 		}
 		return results, nil
 	}
+}
+
+func (fm FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+	return Emit(func(ctx context.Context) <-chan *Result[OUT] {
+		outChan := make(chan *Result[OUT])
+		go func() {
+			defer close(outChan)
+			for resIn := range s.Emit(ctx) {
+				resOuts, err := fm(resIn)
+				if err != nil {
+					select {
+					case <-ctx.Done():
+						return
+					case outChan <- Err[OUT](err):
+					}
+					continue
+				}
+				for _, resOut := range resOuts {
+					select {
+					case <-ctx.Done():
+						return
+					case outChan <- resOut:
+					}
+				}
+			}
+		}()
+		return outChan
+	})
 }
