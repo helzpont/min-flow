@@ -12,70 +12,70 @@
 
 ### Trivial Transformation (10,000 items, minimal work)
 
-| Buffer Size | Time | Memory | vs buf_64 |
-|-------------|------|--------|-----------|
-| 0 (unbuffered) | 3.75ms | 361KB | -50% slower |
-| 1 | 3.21ms | 361KB | -42% slower |
-| 8 | 2.50ms | 361KB | -25% slower |
-| 16 | 2.23ms | 361KB | -16% slower |
-| 32 | 2.05ms | 362KB | -8% slower |
-| **64** | **1.87ms** | **363KB** | baseline |
-| 128 | 1.81ms | 365KB | +3% faster |
-| 256 | 1.76ms | 370KB | +6% faster |
-| 512 | 1.77ms | 379KB | +5% faster |
-| 1024 | 1.75ms | 393KB | +7% faster |
+| Buffer Size    | Time       | Memory    | vs buf_64   |
+| -------------- | ---------- | --------- | ----------- |
+| 0 (unbuffered) | 3.75ms     | 361KB     | -50% slower |
+| 1              | 3.21ms     | 361KB     | -42% slower |
+| 8              | 2.50ms     | 361KB     | -25% slower |
+| 16             | 2.23ms     | 361KB     | -16% slower |
+| 32             | 2.05ms     | 362KB     | -8% slower  |
+| **64**         | **1.87ms** | **363KB** | baseline    |
+| 128            | 1.81ms     | 365KB     | +3% faster  |
+| 256            | 1.76ms     | 370KB     | +6% faster  |
+| 512            | 1.77ms     | 379KB     | +5% faster  |
+| 1024           | 1.75ms     | 393KB     | +7% faster  |
 
 **Observation**: Unbuffered is 2x slower. Improvements flatten after 64.
 
 ### CPU-Bound Transformation (1,000 items, compute-heavy)
 
-| Buffer Size | Time | Memory | vs buf_64 |
-|-------------|------|--------|-----------|
-| 0 | 466µs | 28KB | -46% slower |
-| 16 | 357µs | 29KB | -12% slower |
-| 32 | 339µs | 29KB | -6% slower |
-| **64** | **319µs** | **30KB** | baseline |
-| 128 | 315µs | 33KB | +1% faster |
-| 256 | 317µs | 38KB | 0% |
-| 512 | 317µs | 47KB | 0% |
+| Buffer Size | Time      | Memory   | vs buf_64   |
+| ----------- | --------- | -------- | ----------- |
+| 0           | 466µs     | 28KB     | -46% slower |
+| 16          | 357µs     | 29KB     | -12% slower |
+| 32          | 339µs     | 29KB     | -6% slower  |
+| **64**      | **319µs** | **30KB** | baseline    |
+| 128         | 315µs     | 33KB     | +1% faster  |
+| 256         | 317µs     | 38KB     | 0%          |
+| 512         | 317µs     | 47KB     | 0%          |
 
 **Observation**: Buffer size matters less for CPU-bound work. 64 is optimal.
 
 ### Chained Mappers (5,000 items, 3 stages)
 
-| Buffer Size | Time | Memory | vs buf_64 |
-|-------------|------|--------|-----------|
-| 0 | 4.36ms | 132KB | -160% slower |
-| 16 | 2.38ms | 133KB | -42% slower |
-| 32 | 1.96ms | 135KB | -17% slower |
-| **64** | **1.67ms** | **139KB** | baseline |
-| 128 | 1.54ms | 146KB | +8% faster |
-| 256 | 1.49ms | 160KB | +12% faster |
+| Buffer Size | Time       | Memory    | vs buf_64    |
+| ----------- | ---------- | --------- | ------------ |
+| 0           | 4.36ms     | 132KB     | -160% slower |
+| 16          | 2.38ms     | 133KB     | -42% slower  |
+| 32          | 1.96ms     | 135KB     | -17% slower  |
+| **64**      | **1.67ms** | **139KB** | baseline     |
+| 128         | 1.54ms     | 146KB     | +8% faster   |
+| 256         | 1.49ms     | 160KB     | +12% faster  |
 
 **Observation**: Chained pipelines benefit more from larger buffers, but 64 captures most benefit.
 
 ### FlatMap (1,000 items → 5,000 outputs)
 
-| Buffer Size | Time | Memory | vs buf_64 |
-|-------------|------|--------|-----------|
-| 0 | 1.05ms | 339KB | -40% slower |
-| 16 | 856µs | 340KB | -15% slower |
-| 32 | 790µs | 340KB | -6% slower |
-| **64** | **747µs** | **342KB** | baseline |
-| 128 | 692µs | 344KB | +8% faster |
-| 256 | 666µs | 349KB | +12% faster |
+| Buffer Size | Time      | Memory    | vs buf_64   |
+| ----------- | --------- | --------- | ----------- |
+| 0           | 1.05ms    | 339KB     | -40% slower |
+| 16          | 856µs     | 340KB     | -15% slower |
+| 32          | 790µs     | 340KB     | -6% slower  |
+| **64**      | **747µs** | **342KB** | baseline    |
+| 128         | 692µs     | 344KB     | +8% faster  |
+| 256         | 666µs     | 349KB     | +12% faster |
 
 **Observation**: FlatMap has similar pattern - 64 is solid, larger helps marginally.
 
 ### Large Items (1KB structs, 1,000 items)
 
-| Buffer Size | Time | Memory | vs buf_64 |
-|-------------|------|--------|-----------|
-| 1 | 1.46ms | 3.72MB | -15% slower |
-| 16 | 1.35ms | 3.73MB | -6% slower |
-| 32 | 1.29ms | 3.76MB | -2% slower |
-| **64** | **1.27ms** | **3.79MB** | baseline |
-| 128 | 1.28ms | 3.86MB | 0% |
+| Buffer Size | Time       | Memory     | vs buf_64   |
+| ----------- | ---------- | ---------- | ----------- |
+| 1           | 1.46ms     | 3.72MB     | -15% slower |
+| 16          | 1.35ms     | 3.73MB     | -6% slower  |
+| 32          | 1.29ms     | 3.76MB     | -2% slower  |
+| **64**      | **1.27ms** | **3.79MB** | baseline    |
+| 128         | 1.28ms     | 3.86MB     | 0%          |
 
 **Observation**: With large items, memory grows significantly. 64 is the sweet spot.
 
@@ -93,14 +93,14 @@
 
 ### When to Use Different Sizes
 
-| Workload | Recommended Buffer | Rationale |
-|----------|-------------------|-----------|
-| Default | 64 | Best all-around choice |
-| Low-latency | 16-32 | Reduces buffering delay |
-| High-throughput | 128-256 | Worth the memory for 10%+ gain |
-| Memory-constrained | 16-32 | Reduces memory footprint |
-| Large items (>1KB) | 32-64 | Avoid excessive memory |
-| Chained pipelines | 64-128 | Reduces inter-stage blocking |
+| Workload           | Recommended Buffer | Rationale                      |
+| ------------------ | ------------------ | ------------------------------ |
+| Default            | 64                 | Best all-around choice         |
+| Low-latency        | 16-32              | Reduces buffering delay        |
+| High-throughput    | 128-256            | Worth the memory for 10%+ gain |
+| Memory-constrained | 16-32              | Reduces memory footprint       |
+| Large items (>1KB) | 32-64              | Avoid excessive memory         |
+| Chained pipelines  | 64-128             | Reduces inter-stage blocking   |
 
 ### WithBufferSize Guidelines
 
@@ -125,6 +125,7 @@ stream := mapper.ApplyWith(ctx, source, WithBufferSize(32))
 2. **Document buffer size guidelines** - Add guidance for users choosing custom sizes.
 
 3. **Consider workload-specific presets**:
+
    ```go
    func WithLowLatency() TransformOption { return WithBufferSize(16) }
    func WithHighThroughput() TransformOption { return WithBufferSize(256) }
@@ -136,6 +137,7 @@ stream := mapper.ApplyWith(ctx, source, WithBufferSize(32))
 ## Conclusion
 
 The current `DefaultBufferSize = 64` is validated as an excellent general-purpose choice. It provides:
+
 - 80-95% of maximum throughput
 - Reasonable memory usage
 - Good cache behavior

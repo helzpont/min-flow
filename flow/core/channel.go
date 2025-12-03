@@ -69,20 +69,55 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 
 			// Cache registry lookup - this is the key optimization
 			registry, hasRegistry := GetRegistry(ctx)
-			var interceptors []Interceptor
-			if hasRegistry {
-				interceptors = registry.Interceptors()
+
+			// Early exit: if no registry, just pass through without any invoke overhead
+			if !hasRegistry {
+				for res := range in {
+					select {
+					case <-ctx.Done():
+						return
+					case out <- res:
+					}
+				}
+				return
 			}
 
-			// Helper to invoke matching interceptors without repeated lookups
-			invoke := func(event Event, args ...any) {
-				if !hasRegistry {
-					return
+			interceptors := registry.Interceptors()
+
+			// Early exit: if no interceptors, just pass through
+			if len(interceptors) == 0 {
+				for res := range in {
+					select {
+					case <-ctx.Done():
+						return
+					case out <- res:
+					}
 				}
+				return
+			}
+
+			// Specialized invoke functions to avoid variadic allocation at call sites.
+			// The variadic `args ...any` pattern allocates a slice on EVERY call,
+			// even if the function returns early. These specialized versions eliminate that.
+
+			// invokeNoArg handles events with no arguments (StreamStart, StreamEnd)
+			invokeNoArg := func(event Event) {
 				for _, interceptor := range interceptors {
 					for _, pattern := range interceptor.Events() {
 						if event.Matches(string(pattern)) {
-							_ = interceptor.Do(ctx, event, args...)
+							_ = interceptor.Do(ctx, event)
+							break
+						}
+					}
+				}
+			}
+
+			// invokeOneArg handles events with one argument (most item events)
+			invokeOneArg := func(event Event, arg any) {
+				for _, interceptor := range interceptors {
+					for _, pattern := range interceptor.Events() {
+						if event.Matches(string(pattern)) {
+							_ = interceptor.Do(ctx, event, arg)
 							break
 						}
 					}
@@ -90,11 +125,11 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 			}
 
 			// Invoke stream start interceptors
-			invoke(StreamStart)
+			invokeNoArg(StreamStart)
 
 			defer func() {
 				// Invoke stream end interceptors
-				invoke(StreamEnd)
+				invokeNoArg(StreamEnd)
 			}()
 
 			for res := range in {
@@ -105,21 +140,21 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 				}
 
 				// Invoke item-level interceptors
-				invoke(ItemReceived, res)
+				invokeOneArg(ItemReceived, res)
 
 				if res.IsValue() {
-					invoke(ValueReceived, res.Value())
+					invokeOneArg(ValueReceived, res.Value())
 				} else if res.IsError() {
-					invoke(ErrorOccurred, res.Error())
+					invokeOneArg(ErrorOccurred, res.Error())
 				} else if res.IsSentinel() {
-					invoke(SentinelReceived, res.Error())
+					invokeOneArg(SentinelReceived, res.Error())
 				}
 
 				select {
 				case <-ctx.Done():
 					return
 				case out <- res:
-					invoke(ItemEmitted, res)
+					invokeOneArg(ItemEmitted, res)
 				}
 			}
 		}()
