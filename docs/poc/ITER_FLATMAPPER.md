@@ -13,6 +13,7 @@
 ### Hypothesis
 
 The slice-based FlatMapper allocates a `[]Result[OUT]` slice for every input item:
+
 ```go
 results := make([]Result[OUT], len(mappedValues))
 ```
@@ -41,11 +42,11 @@ BenchmarkFlatMapperVsIterFlatMapper/IterFlatMapper_iter-14    142   8.50ms   4.2
 BenchmarkFlatMapperVsIterFlatMapper/IterFlatMapSlice_iter-14  146   8.15ms   3.96MB   50,037 allocs
 ```
 
-| Approach | Time | Memory | Allocs | vs FlatMapper |
-|----------|------|--------|--------|---------------|
-| FlatMapper (slice) | 7.43ms | 4.04MB | 20,038 | baseline |
-| IterFlatMapper | 8.50ms | 4.28MB | 70,038 | **14% slower, 3.5x allocs** |
-| IterFlatMapSlice | 8.15ms | 3.96MB | 50,037 | **10% slower, 2.5x allocs** |
+| Approach           | Time   | Memory | Allocs | vs FlatMapper               |
+| ------------------ | ------ | ------ | ------ | --------------------------- |
+| FlatMapper (slice) | 7.43ms | 4.04MB | 20,038 | baseline                    |
+| IterFlatMapper     | 8.50ms | 4.28MB | 70,038 | **14% slower, 3.5x allocs** |
+| IterFlatMapSlice   | 8.15ms | 3.96MB | 50,037 | **10% slower, 2.5x allocs** |
 
 ### With Check Strategies
 
@@ -78,6 +79,7 @@ Even with the high-throughput strategy, IterFlatMapper is ~38% slower than FlatM
 ```
 
 The iterator machinery allocates multiple closures per input item:
+
 1. User's `flatMapFunc` returns a new `iter.Seq` (closure)
 2. `IterFlatMap` wrapper creates its own closure
 3. The range loop interaction creates additional allocations
@@ -94,6 +96,7 @@ The iterator machinery allocates multiple closures per input item:
 ## Code Retained
 
 The `IterFlatMapper` implementation was kept in the codebase as it:
+
 - Provides API completeness (some users may prefer iterator style)
 - Enables lazy evaluation patterns
 - Demonstrates Go 1.23 iter.Seq integration
