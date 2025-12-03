@@ -254,6 +254,7 @@ func TestCount(t *testing.T) {
 
 func TestContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	stream := Range(0, 1000000)
 

@@ -6,24 +6,26 @@ High-performance stream processing that sacrifices min-flow's safety features fo
 
 ## What's Different?
 
-| Feature | `flow/core` | `flow/fast` |
-|---------|-------------|-------------|
-| Result wrapping | ✅ `Result[T]` | ❌ Direct values |
-| Panic recovery | ✅ Wrapped in `ErrPanic` | ❌ Panics propagate |
-| Error handling | ✅ `Err[T]` results | ❌ None |
-| Context checks | ✅ Per-item | ⚠️ At channel ops only |
-| Interceptors | ✅ Full delegate system | ❌ None |
-| Sentinels | ✅ `Sentinel[T]` | ❌ None |
+| Feature         | `flow/core`              | `flow/fast`            |
+| --------------- | ------------------------ | ---------------------- |
+| Result wrapping | ✅ `Result[T]`           | ❌ Direct values       |
+| Panic recovery  | ✅ Wrapped in `ErrPanic` | ❌ Panics propagate    |
+| Error handling  | ✅ `Err[T]` results      | ❌ None                |
+| Context checks  | ✅ Per-item              | ⚠️ At channel ops only |
+| Interceptors    | ✅ Full delegate system  | ❌ None                |
+| Sentinels       | ✅ `Sentinel[T]`         | ❌ None                |
 
 ## When to Use
 
 ✅ **Good candidates:**
+
 - CPU-bound transformations where channel overhead dominates
 - Trusted, well-tested transformation functions
 - Benchmarking min-flow feature overhead
 - Hot paths in production after extensive testing
 
 ❌ **Avoid when:**
+
 - Processing untrusted or user-provided data
 - Error recovery is needed
 - Observability (metrics, logging) is required
@@ -103,10 +105,12 @@ go test -bench=. ./benchmarks/...
 ```
 
 Compare results between:
+
 - `BenchmarkPipeline_MinFlow_*` - Full feature set
 - `BenchmarkPipeline_Fast_*` - Minimal overhead
 
 The difference reveals the cost of:
+
 1. **Result wrapping** - Allocating `Result[T]` vs direct values
 2. **Panic recovery** - `defer/recover` in every mapper
 3. **Error handling** - Checking `IsError()` on each item

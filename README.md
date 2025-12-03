@@ -98,11 +98,11 @@ stream := flow.FromIter(myIterator)  // Go 1.23+ iter.Seq
 
 Every item in a stream is wrapped in a `Result[T]`:
 
-| State | Description | Constructor |
-|-------|-------------|-------------|
-| **Value** | Successful result | `flow.Ok(value)` |
-| **Error** | Recoverable error (stream continues) | `flow.Err[T](err)` |
-| **Sentinel** | Control signal (end of stream) | `flow.Sentinel[T](err)` |
+| State        | Description                          | Constructor             |
+| ------------ | ------------------------------------ | ----------------------- |
+| **Value**    | Successful result                    | `flow.Ok(value)`        |
+| **Error**    | Recoverable error (stream continues) | `flow.Err[T](err)`      |
+| **Sentinel** | Control signal (end of stream)       | `flow.Sentinel[T](err)` |
 
 ### Transformers
 
@@ -197,6 +197,7 @@ timing.Timeout[T](duration)         // Timeout per item
 timing.Sample[T](duration)          // Periodic sampling
 timing.RateLimit[T](rate, burst)    // Token bucket limiting
 ```
+
 ### Error Handling & Resilience (`flow/flowerrors`)
 
 ```go
