@@ -161,11 +161,11 @@ func (e *ErrorCollectorInterceptor) Clear() {
 // CircuitBreakerInterceptor monitors error rates and can trip a circuit breaker.
 // When the error threshold is reached, it returns an error to stop processing.
 type CircuitBreakerInterceptor struct {
-	mu              sync.Mutex
-	failureCount    int
-	threshold       int
-	onThresholdHit  func()
-	thresholdHit    bool
+	mu             sync.Mutex
+	failureCount   int
+	threshold      int
+	onThresholdHit func()
+	thresholdHit   bool
 }
 
 // NewCircuitBreakerInterceptor creates a circuit breaker that trips after threshold errors.
