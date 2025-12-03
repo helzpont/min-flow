@@ -46,19 +46,19 @@ func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[O
 // This is a low-level primitive used to enable interceptor-based observation
 // and error handling without creating explicit transformer stages.
 //
-// Uses a default buffer size of 64 to balance throughput and backpressure.
+// Uses DefaultBufferSize (64) to balance throughput and backpressure.
 // For strict backpressure (unbuffered), use InterceptBuffered(0).
 func Intercept[T any]() Transmitter[T, T] {
-	return InterceptBuffered[T](64)
+	return InterceptBuffered[T](DefaultBufferSize)
 }
 
 // InterceptBuffered creates an Intercept transmitter with buffered output channel.
-// A buffer size of 0 uses an unbuffered channel (same as Intercept).
+// A buffer size of 0 uses an unbuffered channel for strict backpressure.
 // Larger buffers reduce goroutine synchronization overhead at the cost of memory.
 //
 // Recommended buffer sizes:
 //   - 0: Strict backpressure, highest latency
-//   - 16-64: Good balance for most use cases
+//   - 16-64: Good balance for most use cases (Intercept uses 64 by default)
 //   - 256+: High-throughput scenarios
 func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 	return Transmit(func(ctx context.Context, in <-chan Result[T]) <-chan Result[T] {

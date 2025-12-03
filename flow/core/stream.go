@@ -13,7 +13,7 @@ import (
 )
 
 // Stream represents a flow of data. It is a higher-level abstraction
-// then channels, providing methods for processing the stream's data.
+// than channels, providing methods for processing the stream's data.
 // Along with Transformer, it enables building complex data processing
 // pipelines.
 // Stream answers the question: "What operations will produce the stream's data?".

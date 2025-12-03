@@ -116,11 +116,11 @@ Interceptors enable cross-cutting concerns but add overhead per item.
 
 ### Per-Item Cost (10K items)
 
-| Configuration      | Time   | Per-Item | Notes                        |
-| ------------------ | ------ | -------- | ---------------------------- |
-| Baseline           | 650μs  | ~65ns    |                              |
-| With 1 interceptor | 5.9ms  | ~590ns   | Default (buffered, size=64)  |
-| Unbuffered         | 7.8ms  | ~780ns   | Strict backpressure mode     |
+| Configuration      | Time  | Per-Item | Notes                       |
+| ------------------ | ----- | -------- | --------------------------- |
+| Baseline           | 650μs | ~65ns    |                             |
+| With 1 interceptor | 5.9ms | ~590ns   | Default (buffered, size=64) |
+| Unbuffered         | 7.8ms | ~780ns   | Strict backpressure mode    |
 
 **Observations**:
 

@@ -138,22 +138,32 @@ func EndOfStream[OUT any]() Result[OUT] {
 	return Result[OUT]{value: zero, err: ErrEndOfStream, isSentinel: true}
 }
 
+// IsValue returns true if this Result contains a successful value.
+// A Result is a value if it has no error and is not a sentinel.
 func (r Result[OUT]) IsValue() bool {
 	return r.err == nil && !r.isSentinel
 }
 
+// IsSentinel returns true if this Result is a sentinel (control signal).
+// Sentinels may carry an optional error for context (e.g., ErrEndOfStream).
 func (r Result[OUT]) IsSentinel() bool {
 	return r.isSentinel
 }
 
+// IsError returns true if this Result contains a processing error.
+// Errors are non-fatal; the stream continues processing subsequent items.
 func (r Result[OUT]) IsError() bool {
 	return r.err != nil && !r.isSentinel
 }
 
+// Value returns the contained value. Only meaningful when IsValue() is true.
+// Returns the zero value if this is an error or sentinel.
 func (r Result[OUT]) Value() OUT {
 	return r.value
 }
 
+// Error returns the error if this is an error Result.
+// Returns nil for value Results and sentinels (use Sentinel() for sentinel errors).
 func (r Result[OUT]) Error() error {
 	if r.isSentinel {
 		return nil
@@ -161,6 +171,8 @@ func (r Result[OUT]) Error() error {
 	return r.err
 }
 
+// Sentinel returns the sentinel's context error if this is a sentinel Result.
+// Returns nil for value and error Results.
 func (r Result[OUT]) Sentinel() error {
 	if !r.isSentinel {
 		return nil
@@ -168,6 +180,8 @@ func (r Result[OUT]) Sentinel() error {
 	return r.err
 }
 
+// Unwrap returns the value and error together.
+// Useful for cases where you need both regardless of Result type.
 func (r Result[OUT]) Unwrap() (OUT, error) {
 	return r.value, r.err
 }
