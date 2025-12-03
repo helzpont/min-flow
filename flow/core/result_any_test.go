@@ -48,6 +48,50 @@ func BenchmarkResultCreation(b *testing.B) {
 		_ = sink
 	})
 
+	// Pointer type - should also be efficient with any
+	b.Run("Result[*int]", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink Result[*int]
+		v := 42
+		p := &v
+		for i := 0; i < b.N; i++ {
+			sink = Ok(p)
+		}
+		_ = sink
+	})
+
+	b.Run("AnyResult_*int", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink AnyResult
+		v := 42
+		p := &v
+		for i := 0; i < b.N; i++ {
+			sink = AnyOk(p)
+		}
+		_ = sink
+	})
+
+	// Slice type
+	b.Run("Result[[]int]", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink Result[[]int]
+		slice := []int{1, 2, 3, 4, 5}
+		for i := 0; i < b.N; i++ {
+			sink = Ok(slice)
+		}
+		_ = sink
+	})
+
+	b.Run("AnyResult_[]int", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink AnyResult
+		slice := []int{1, 2, 3, 4, 5}
+		for i := 0; i < b.N; i++ {
+			sink = AnyOk(slice)
+		}
+		_ = sink
+	})
+
 	// Larger struct to see if any-based helps more with larger types
 	type LargeStruct struct {
 		A, B, C, D, E int64
@@ -71,6 +115,87 @@ func BenchmarkResultCreation(b *testing.B) {
 		ls := LargeStruct{A: 1, B: 2, C: 3, D: 4, E: 5, Name: "test", Data: []byte("data")}
 		for i := 0; i < b.N; i++ {
 			sink = AnyOk(ls)
+		}
+		_ = sink
+	})
+
+	// Pointer to struct - avoids copying
+	b.Run("Result[*LargeStruct]", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink Result[*LargeStruct]
+		ls := &LargeStruct{A: 1, B: 2, C: 3, D: 4, E: 5, Name: "test", Data: []byte("data")}
+		for i := 0; i < b.N; i++ {
+			sink = Ok(ls)
+		}
+		_ = sink
+	})
+
+	b.Run("AnyResult_*LargeStruct", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink AnyResult
+		ls := &LargeStruct{A: 1, B: 2, C: 3, D: 4, E: 5, Name: "test", Data: []byte("data")}
+		for i := 0; i < b.N; i++ {
+			sink = AnyOk(ls)
+		}
+		_ = sink
+	})
+}
+
+// BenchmarkPointerAllocationCost measures the cost of pointer indirection
+// to see if using pointers to avoid boxing is viable
+func BenchmarkPointerAllocationCost(b *testing.B) {
+	// Baseline: direct int in Result[int]
+	b.Run("Result[int]_direct", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink Result[int]
+		for i := 0; i < b.N; i++ {
+			sink = Ok(i)
+		}
+		_ = sink
+	})
+
+	// Option 1: Use pointer in Result[*int] (pre-allocated)
+	b.Run("Result[*int]_preallocated", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink Result[*int]
+		v := 42
+		p := &v
+		for i := 0; i < b.N; i++ {
+			sink = Ok(p)
+		}
+		_ = sink
+	})
+
+	// Option 2: Allocate pointer each time - this is what you'd need in practice
+	b.Run("Result[*int]_allocate_each", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink Result[*int]
+		for i := 0; i < b.N; i++ {
+			v := i
+			sink = Ok(&v)
+		}
+		_ = sink
+	})
+
+	// Option 3: AnyResult with pointer (pre-allocated)
+	b.Run("AnyResult_*int_preallocated", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink AnyResult
+		v := 42
+		p := &v
+		for i := 0; i < b.N; i++ {
+			sink = AnyOk(p)
+		}
+		_ = sink
+	})
+
+	// Option 4: AnyResult with pointer (allocated each time)
+	b.Run("AnyResult_*int_allocate_each", func(b *testing.B) {
+		b.ReportAllocs()
+		var sink AnyResult
+		for i := 0; i < b.N; i++ {
+			v := i
+			sink = AnyOk(&v)
 		}
 		_ = sink
 	})
