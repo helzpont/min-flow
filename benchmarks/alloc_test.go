@@ -88,20 +88,6 @@ func BenchmarkAlloc_Map_RawLoop(b *testing.B) {
 // Chained Operations - Multiple allocations per item
 // =============================================================================
 
-func BenchmarkAlloc_Chain_MinFlow(b *testing.B) {
-	data := generateInts(AllocSize)
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for i := 0; i < b.N; i++ {
-		stream := flow.FromSlice(data)
-		step1 := core.Map(squareWithErr).Apply(ctx, stream)
-		step2 := core.Map(squareWithErr).Apply(ctx, step1)
-		step3 := core.Map(squareWithErr).Apply(ctx, step2)
-		_, _ = core.Slice(ctx, step3)
-	}
-}
-
 func BenchmarkAlloc_Chain_Rill(b *testing.B) {
 	data := generateInts(AllocSize)
 	b.ResetTimer()
