@@ -60,6 +60,7 @@ type Pool[T any] interface {
 // interface and adds a Validate method to ensure the configuration is valid.
 type Config interface {
 	Delegate
+
 	Validate() error
 }
 

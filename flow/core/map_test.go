@@ -37,9 +37,102 @@ func TestTransformConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := applyOptions(tt.opts...)
+			cfg := applyOptions(context.Background(), tt.opts...)
 			if cfg.BufferSize != tt.wantBufferSize {
 				t.Errorf("BufferSize = %d, want %d", cfg.BufferSize, tt.wantBufferSize)
+			}
+		})
+	}
+}
+
+func TestTransformConfig_Delegate(t *testing.T) {
+	cfg := &TransformConfig{BufferSize: 64}
+
+	// Test Init
+	if err := cfg.Init(); err != nil {
+		t.Errorf("Init() error = %v, want nil", err)
+	}
+
+	// Test Close
+	if err := cfg.Close(); err != nil {
+		t.Errorf("Close() error = %v, want nil", err)
+	}
+}
+
+func TestTransformConfig_Validate(t *testing.T) {
+	tests := []struct {
+		name       string
+		bufferSize int
+		wantErr    bool
+	}{
+		{
+			name:       "valid zero",
+			bufferSize: 0,
+			wantErr:    false,
+		},
+		{
+			name:       "valid positive",
+			bufferSize: 64,
+			wantErr:    false,
+		},
+		{
+			name:       "invalid negative",
+			bufferSize: -1,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &TransformConfig{BufferSize: tt.bufferSize}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestTransformConfig_FromContext(t *testing.T) {
+	tests := []struct {
+		name           string
+		ctxBufferSize  int
+		opts           []TransformOption
+		wantBufferSize int
+	}{
+		{
+			name:           "context config only",
+			ctxBufferSize:  128,
+			opts:           nil,
+			wantBufferSize: 128,
+		},
+		{
+			name:           "option overrides context",
+			ctxBufferSize:  128,
+			opts:           []TransformOption{WithBufferSize(256)},
+			wantBufferSize: 256,
+		},
+		{
+			name:           "no context config uses default",
+			ctxBufferSize:  -1, // sentinel for no context config
+			opts:           nil,
+			wantBufferSize: DefaultBufferSize,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tt.ctxBufferSize >= 0 {
+				var registry *Registry
+				ctx, registry = WithRegistry(ctx)
+				cfg := &TransformConfig{BufferSize: tt.ctxBufferSize}
+				_ = registry.Register(cfg)
+			}
+
+			result := applyOptions(ctx, tt.opts...)
+			if result.BufferSize != tt.wantBufferSize {
+				t.Errorf("BufferSize = %d, want %d", result.BufferSize, tt.wantBufferSize)
 			}
 		})
 	}

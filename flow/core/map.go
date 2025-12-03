@@ -11,8 +11,28 @@ import (
 const DefaultBufferSize = 64
 
 // TransformConfig holds configuration options for transform operations.
+// It implements the Config interface, allowing it to be registered in a
+// Registry and accessed via context for stream-level configuration.
 type TransformConfig struct {
 	BufferSize int
+}
+
+// Init initializes the TransformConfig. Currently a no-op.
+func (c *TransformConfig) Init() error {
+	return nil
+}
+
+// Close cleans up the TransformConfig. Currently a no-op.
+func (c *TransformConfig) Close() error {
+	return nil
+}
+
+// Validate ensures the TransformConfig has valid values.
+func (c *TransformConfig) Validate() error {
+	if c.BufferSize < 0 {
+		return fmt.Errorf("buffer size must be non-negative, got %d", c.BufferSize)
+	}
+	return nil
 }
 
 // TransformOption is a functional option for configuring transforms.
@@ -35,9 +55,17 @@ func defaultConfig() TransformConfig {
 	}
 }
 
-// applyOptions applies functional options to a config.
-func applyOptions(opts ...TransformOption) TransformConfig {
+// applyOptions builds a config by starting with defaults, overlaying any
+// context-level config, then applying functional options (highest priority).
+func applyOptions(ctx context.Context, opts ...TransformOption) TransformConfig {
 	cfg := defaultConfig()
+
+	// Check for stream-level config in context
+	if ctxCfg, ok := GetConfig[*TransformConfig](ctx); ok {
+		cfg = *ctxCfg
+	}
+
+	// Functional options override context config
 	for _, opt := range opts {
 		opt(&cfg)
 	}
@@ -78,7 +106,7 @@ func (m Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
 
 // ApplyWith transforms a stream using this Mapper with custom options.
 func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
-	cfg := applyOptions(opts...)
+	cfg := applyOptions(ctx, opts...)
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
 		outChan := make(chan Result[OUT], cfg.BufferSize)
 		go func() {
@@ -218,7 +246,7 @@ func (fm FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OU
 
 // ApplyWith transforms a stream using this FlatMapper with custom options.
 func (fm FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
-	cfg := applyOptions(opts...)
+	cfg := applyOptions(ctx, opts...)
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
 		outChan := make(chan Result[OUT], cfg.BufferSize)
 		go func() {
