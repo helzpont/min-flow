@@ -10,8 +10,10 @@ A unified stream processing framework for Go that combines the best patterns fro
 - **Type-Safe Streams**: Fully generic streams with compile-time type checking
 - **Composable Transformers**: Chain operations naturally with a fluent API
 - **Error Handling**: Built-in `Result[T]` type distinguishes between values, errors, and sentinels
+- **Resilience**: Retry, backoff, circuit breaker, and timeout patterns
 - **Concurrency**: Leverages Go channels for efficient parallel processing
 - **Extensible**: Delegate system for interceptors, factories, and resource pools
+- **Observable**: Built-in metrics, tracing, and debugging support
 - **Zero Dependencies**: Core package uses only the standard library
 
 ## Installation
@@ -41,15 +43,15 @@ func main() {
     // Create a stream from a slice
     stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-    // Apply transformations
-    result := filter.Filter(func(n int) bool {
-        return n%2 == 0 // Keep even numbers
+    // Filter even numbers
+    evens := filter.Where(func(n int) bool {
+        return n%2 == 0
     }).Apply(ctx, stream)
 
-    // Map to squares
+    // Double them
     doubled := flow.Map(func(n int) (int, error) {
         return n * 2, nil
-    }).Apply(ctx, result)
+    }).Apply(ctx, evens)
 
     // Collect results
     values, err := flow.Slice(ctx, doubled)
@@ -63,60 +65,64 @@ func main() {
 
 ## Package Structure
 
-The framework is organized into focused packages:
-
 ```
 flow/
-  core/                    # Core abstractions (stdlib only)
-  aggregate/               # Batching, reduction, windowing
-  combine/                 # Stream merging, fan-out/fan-in
-  filter/                  # Filtering, taking, skipping, selection
-  timing/                  # Time-based operators (delay, debounce, throttle)
-  flowerrors/              # Error handling and resilience
-  parallel/                # Parallel/async processing
-  observe/                 # Observability, metrics, side-effects
-  transform/               # General transformations (distinct, indexed, etc.)
+├── core/           # Core abstractions (stdlib only, no external deps)
+├── aggregate/      # Batching, reduction, windowing
+├── combine/        # Stream merging, splitting, fan-out/fan-in
+├── filter/         # Filtering, taking, skipping, sampling
+├── flowerrors/     # Error handling, retry, circuit breaker
+├── observe/        # Metrics, tracing, debugging
+├── parallel/       # Concurrent processing with worker pools
+├── timing/         # Delays, throttling, debouncing
+└── transform/      # Utility transformations (distinct, pairwise, etc.)
 ```
+
+Each package has its own README with detailed documentation and examples.
 
 ## Core Concepts
 
 ### Streams
 
-A `Stream[T]` represents a lazy sequence of values that can be consumed exactly once:
+A `Stream[T]` represents a lazy sequence of values:
 
 ```go
 // Create streams from various sources
 stream := flow.FromSlice([]int{1, 2, 3})
 stream := flow.FromChannel(ch)
 stream := flow.Range(1, 100)
-stream := flow.FromIter(myIterator)
+stream := flow.FromIter(myIterator)  // Go 1.23+ iter.Seq
 ```
 
 ### Results
 
-Every item in a stream is wrapped in a `Result[T]` which can be:
+Every item in a stream is wrapped in a `Result[T]`:
 
-- **Value**: A successful processing result (`flow.Ok(value)`)
-- **Error**: A recoverable error (`flow.Err[T](err)`) - stream continues
-- **Sentinel**: A stream control signal (`flow.Sentinel[T](err)`) - e.g., end of stream
+| State | Description | Constructor |
+|-------|-------------|-------------|
+| **Value** | Successful result | `flow.Ok(value)` |
+| **Error** | Recoverable error (stream continues) | `flow.Err[T](err)` |
+| **Sentinel** | Control signal (end of stream) | `flow.Sentinel[T](err)` |
 
 ### Transformers
 
-Transformers convert one stream to another:
+Transformers convert streams from one type to another:
 
 ```go
-// Using the Transformer interface
-filtered := filter.Filter(predicate).Apply(ctx, stream)
+// Apply a single transformer
+filtered := filter.Where(isEven).Apply(ctx, stream)
 
-// Chaining transformers
-filtered := filter.Filter(isEven).Apply(ctx, stream)
-taken := filter.Take[int](10).Apply(ctx, filtered)
-distinct := transform.Distinct[int]().Apply(ctx, taken)
+// Chain multiple transformers
+result := flow.Pipe(ctx, stream,
+    filter.Where(isValid),
+    filter.Take[int](10),
+    transform.Distinct[int](),
+)
 ```
 
-### Mappers and FlatMappers
+### Mappers
 
-Low-level 1:1 and 1:N transformations:
+Low-level transformation functions with panic recovery:
 
 ```go
 // 1:1 mapping
@@ -124,228 +130,138 @@ doubler := flow.Map(func(n int) (int, error) {
     return n * 2, nil
 })
 
-// 1:N mapping (can emit 0 or more items per input)
+// 1:N mapping
 exploder := flow.FlatMap(func(n int) ([]int, error) {
     return []int{n, n * 2, n * 3}, nil
 })
+
+// Fusion for performance (eliminates intermediate channels)
+fused := flow.Fuse(mapper1, mapper2)
 ```
 
-## Stream Sources
-
-```go
-// Slice and Iterator sources
-flow.FromSlice([]T{...})
-flow.FromIter(seq iter.Seq[T])
-flow.FromIter2(seq iter.Seq2[int, T])
-flow.FromMap(map[K]V{...})
-
-// Channel sources
-flow.FromChannel(ch <-chan T)
-flow.FromChannelWithErrors(ch <-chan T, errCh <-chan error)
-
-// Numeric ranges
-flow.Range(start, end)
-flow.RangeStep(start, end, step)
-
-// Time-based sources
-flow.Timer(duration)           // Emits once after duration
-flow.TimerValue(duration, val) // Emits value after duration
-flow.Interval(duration)        // Emits incrementing values periodically
-flow.IntervalWithDelay(d, init)
-
-// Factory functions
-flow.Just(value)               // Single value
-flow.Repeat(value, count)      // Repeated value
-flow.Empty[T]()                // Empty stream
-flow.Never[T]()                // Never emits, never completes
-flow.FromError[T](err)         // Single error
-flow.Defer(func() Stream[T])   // Lazy stream creation
-flow.Create(func(ctx, emit, emitError) error) // Imperative creation
-flow.Unfold(seed, unfolder)    // State-based generation
-flow.Iterate(seed, fn)         // Infinite iteration
-flow.IterateN(seed, fn, n)     // Limited iteration
-```
-
-## Operators
+## Key Operators
 
 ### Filtering (`flow/filter`)
 
 ```go
-filter.Filter(predicate)        // Keep matching items
-filter.FilterWithIndex(pred)    // With index
-filter.Take[T](n)               // First n items
-filter.TakeLast[T](n)           // Last n items
-filter.Skip[T](n)               // Skip first n
-filter.SkipLast[T](n)           // Skip last n
-filter.TakeWhile(pred)          // While predicate true
-filter.SkipWhile(pred)          // Until predicate false
-filter.TakeUntil(notifier)      // Until notifier emits
-filter.SkipUntil(notifier)      // After notifier emits
-filter.Find(predicate)          // First matching
-filter.Contains(value)          // Contains value?
-filter.ElementAt[T](index)      // Element at index
-filter.Single(predicate)        // Exactly one matching
+filter.Where(predicate)      // Keep matching items
+filter.Take[T](n)            // First n items
+filter.Skip[T](n)            // Skip first n
+filter.TakeWhile(pred)       // While predicate true
+filter.Distinct[T]()         // Remove consecutive duplicates
+filter.First[T]()            // First item only
+filter.Last[T]()             // Last item only
+filter.SampleWith(sampler)   // Sample when sampler emits
 ```
 
 ### Aggregation (`flow/aggregate`)
 
 ```go
-aggregate.Reduce(initial, reducer) // Single accumulated value
-aggregate.Scan(initial, reducer)   // Running accumulation
-aggregate.Count[T]()               // Count items
-aggregate.Sum[T]()                 // Numeric sum
-aggregate.Average[T]()             // Numeric average
-aggregate.Min[T]()                 // Minimum value
-aggregate.Max[T]()                 // Maximum value
-aggregate.All(predicate)           // All match?
-aggregate.Any(predicate)           // Any match?
-aggregate.None(predicate)          // None match?
-aggregate.Batch[T](size)           // Fixed-size batches
-aggregate.BatchTimeout(size, dur)  // With timeout
-aggregate.Window[T](size)          // Sliding window
-aggregate.WindowTime[T](duration)  // Time-based window
-aggregate.GroupBy(keyFunc)         // Group by key
+aggregate.Reduce(reducer)           // Reduce to single value
+aggregate.Fold(initial, folder)     // Fold with initial value
+aggregate.Scan(initial, scanner)    // Running accumulation
+aggregate.Batch[T](size)            // Fixed-size batches
+aggregate.BatchTimeout(size, dur)   // Batches with timeout
+aggregate.WindowTime[T](duration)   // Time-based windows
+aggregate.GroupBy(keyFunc)          // Group by key
 ```
 
-### Timing (`flow/timing`)
+### Combining (`flow/combine`)
 
 ```go
-timing.Delay[T](duration)          // Delay all items
-timing.Debounce[T](duration)       // Debounce emissions
-timing.Throttle[T](duration)       // Rate limiting
-timing.Timeout[T](duration)        // Timeout per item
-timing.Sample[T](duration)         // Periodic sampling
-timing.Buffer[T](size)             // Rolling buffer
-timing.BufferTime[T](duration)     // Time-based buffer
+combine.Merge(streams...)           // Interleaved merge
+combine.Concat(streams...)          // Sequential concat
+combine.Zip(s1, s2)                 // Pair elements
+combine.FanOut(n, stream)           // Split to n streams
+combine.FanIn(streams...)           // Merge streams
+combine.CombineLatest(streams...)   // Latest from each
+combine.Race(streams...)            // First to emit wins
 ```
 
 ### Parallel Processing (`flow/parallel`)
 
 ```go
-parallel.Parallel(n, mapper)       // Unordered parallel map
-parallel.ParallelOrdered(n, mapper) // Ordered results
-parallel.ParallelMap(n, mapper)    // Parallel mapping
-parallel.ParallelFlatMap(n, fm)    // Parallel flat map
-parallel.AsyncMap(mapper)          // Async mapping
-parallel.AsyncMapOrdered(mapper)   // Ordered async
+parallel.Map(n, mapper)             // Parallel map (unordered)
+parallel.MapOrdered(n, mapper)      // Parallel map (ordered)
+parallel.FlatMap(n, flatMapper)     // Parallel flat map
+parallel.ForEach(n, action)         // Parallel side effects
 ```
 
+### Timing (`flow/timing`)
+
+```go
+timing.Delay[T](duration)           // Delay all items
+timing.Debounce[T](duration)        // Wait for silence
+timing.Throttle[T](duration)        // Rate limiting
+timing.Timeout[T](duration)         // Timeout per item
+timing.Sample[T](duration)          // Periodic sampling
+timing.RateLimit[T](rate, burst)    // Token bucket limiting
+```
 ### Error Handling & Resilience (`flow/flowerrors`)
 
 ```go
-flowerrors.Retry[T](maxAttempts)   // Retry on error
-flowerrors.RetryWithBackoff(conf)  // Exponential backoff
-flowerrors.CircuitBreaker[T](conf) // Circuit breaker pattern
-flowerrors.OnError(handler)        // Error handling
-flowerrors.CatchError(handler)     // Catch and handle errors
-flowerrors.MapErrors(fn)           // Transform errors
-flowerrors.FilterErrors(pred)      // Filter errors
-flowerrors.Fallback(value)         // Fallback on error
-```
+// Error observation and handling
+flowerrors.OnError(handler)                    // Side effect on error
+flowerrors.CatchError(predicate, handler)      // Catch specific errors
+flowerrors.OnErrorReturn(defaultValue)         // Replace error with value
+flowerrors.OnErrorResumeNext(fallbackStream)   // Switch to fallback
 
-### Fan-out/Fan-in & Combination (`flow/combine`)
+// Retry patterns
+flowerrors.Retry(maxAttempts, operation)       // Simple retry
+flowerrors.RetryWithBackoff(max, backoff, op)  // With backoff strategy
 
-```go
-combine.FanOut(n, stream)          // Split to n streams
-combine.FanIn(streams...)          // Merge streams
-combine.Broadcast(n, stream)       // Broadcast to all
-combine.RoundRobin(n, stream)      // Round-robin distribution
-combine.Balance(n, stream)         // Load balancing
-combine.Tee(n, stream)             // Tee to multiple consumers
-combine.PartitionStream(pred)      // Split by predicate
-combine.Merge(streams...)          // Interleaved merge
-combine.Concat(streams...)         // Sequential concat
-combine.Zip(s1, s2)                // Pair elements
-combine.ZipWith(s1, s2, fn)        // Combine with function
-combine.Interleave(streams...)     // Round-robin interleave
-combine.CombineLatest(streams...)  // Latest from each
-combine.Race(streams...)           // First to emit wins
-```
+// Backoff strategies
+flowerrors.ConstantBackoff(delay)
+flowerrors.ExponentialBackoff(initial, multiplier)
+flowerrors.ExponentialJitterBackoff(initial, multiplier, jitter)
 
-### Transform & Utility (`flow/transform`)
+// Circuit breaker
+cb := flowerrors.NewCircuitBreaker(flowerrors.CircuitBreakerConfig{
+    FailureThreshold: 5,
+    SuccessThreshold: 2,
+    Timeout:          30 * time.Second,
+})
+protected := flowerrors.WithCircuitBreaker(cb, operation).Apply(ctx, stream)
 
-```go
-transform.Distinct[T]()            // Remove duplicates
-transform.DistinctBy(keyFunc)      // By key
-transform.WithIndex[T]()           // Add index to items
-transform.Pairwise[T]()            // Emit consecutive pairs
-transform.DefaultIfEmpty(value)    // Default if empty
-transform.Collect[T]()             // Collect to slice
-transform.CollectMap(keyFunc)      // Collect to map
+// Timeout
+flowerrors.Timeout(duration, operation)
 ```
 
 ### Observability (`flow/observe`)
 
 ```go
-observe.Do(action)                 // Side effect per item
-observe.DoOnError(handler)         // On error side effect
-observe.Tap(observer)              // Observe without changing
-observe.Log[T](prefix)             // Debug logging
-observe.Metrics[T]()               // Collect stream metrics
-observe.Progress(total, handler)   // Progress reporting
+observe.Tap(action)            // Side effect per item
+observe.TapError(handler)      // Side effect on error
+observe.Trace[T](prefix)       // Debug logging
+observe.Meter(onComplete)      // Collect stream metrics
+observe.DoOnComplete(action)   // On completion callback
+observe.DoFinally(action)      // Always called (complete/error/cancel)
 ```
 
-operators.FindIndex(predicate) // Index of first match
-operators.FindLast(predicate) // Last matching
-operators.FindLastIndex(predicate) // Index of last match
-operators.Contains(value) // Contains value?
-operators.ContainsBy(predicate) // Contains matching?
-operators.IsEmpty[T]() // Stream empty?
-operators.IsNotEmpty[T]() // Stream not empty?
-operators.ElementAt[T](index) // Element at index
-operators.Single(predicate) // Exactly one matching
-operators.SequenceEqual(other) // Streams equal?
+## Terminal Operations
 
-````
-
-### Utility
+Consume streams to produce final results:
 
 ```go
-operators.Do(action)               // Side effect per item
-operators.DoOnError(handler)       // On error side effect
-operators.Tap(observer)            // Observe without changing
-operators.Log[T](prefix)           // Debug logging
-operators.Materialize[T]()         // Wrap in Results
-operators.Dematerialize[T]()       // Unwrap Results
-operators.DefaultIfEmpty(value)    // Default if empty
-operators.SwitchIfEmpty(alt)       // Alternative if empty
-operators.StartWith(values...)     // Prepend values
-operators.EndWith(values...)       // Append values
-````
+values, err := flow.Slice(ctx, stream)   // Collect all values
+first, err := flow.First(ctx, stream)    // First value only
+err := flow.Run(ctx, stream)             // Run for side effects
+results := flow.Collect(ctx, stream)     // Collect all Results
 
-## Composition
-
-Chain transformers elegantly:
-
-```go
-// Using Pipe
-pipeline := flow.Pipe(
-    operators.Filter(isValid),
-    operators.Take[User](100),
-    operators.Distinct[User](),
-)
-result := pipeline.Apply(ctx, users)
-
-// Using Chain (for same types)
-pipeline := flow.Chain(
-    operators.Filter(isAdult),
-    operators.Skip[Person](10),
-    operators.Take[Person](20),
-)
-
-// Using Apply for sequential application
-result := flow.Apply(
-    ctx,
-    stream,
-    operators.Filter(pred1),
-    operators.Filter(pred2),
-)
+// Using Go 1.23+ range
+for result := range flow.All(ctx, stream) {
+    if result.IsValue() {
+        process(result.Value())
+    }
+}
 ```
 
 ## Error Handling
 
+Errors in min-flow are values, not exceptions. They flow through the stream and can be handled at any point:
+
 ```go
-// Errors are wrapped in Results
+// Errors from mappers become error Results
 stream := flow.FromSlice([]int{1, 2, 3})
 result := flow.Map(func(n int) (int, error) {
     if n == 2 {
@@ -353,31 +269,28 @@ result := flow.Map(func(n int) (int, error) {
     }
     return n * 2, nil
 }).Apply(ctx, stream)
+// Stream continues: Ok(2), Err("skip 2"), Ok(6)
 
-// Handle errors
-handled := operators.OnError(func(err error) {
+// Log errors without stopping
+logged := flowerrors.OnError(func(err error) {
     log.Printf("Error: %v", err)
 }).Apply(ctx, result)
 
-// Or use MapErrors
-remapped := operators.MapErrors(func(err error) error {
-    return fmt.Errorf("wrapped: %w", err)
-}).Apply(ctx, result)
-```
+// Catch and recover from specific errors
+recovered := flowerrors.CatchError(
+    func(err error) bool { return errors.Is(err, ErrNotFound) },
+    func(err error) (int, error) { return 0, nil },  // Replace with default
+).Apply(ctx, result)
 
-## Terminal Operations
+// Retry transient failures
+retried := flowerrors.Retry(3, fetchFromAPI).Apply(ctx, stream)
 
-Consume streams to get final results:
-
-```go
-// Collect all values
-values, err := flow.Slice(ctx, stream)
-
-// Get first value
-value, err := flow.First(ctx, stream)
-
-// Run for side effects only
-err := flow.Run(ctx, stream)
+// With exponential backoff
+retried := flowerrors.RetryWithBackoff(
+    3,
+    flowerrors.ExponentialBackoff(100*time.Millisecond, 2.0),
+    fetchFromAPI,
+).Apply(ctx, stream)
 ```
 
 ## Context and Cancellation
@@ -388,8 +301,7 @@ All operations respect context cancellation:
 ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 defer cancel()
 
-// Stream will terminate when context is cancelled
-values, err := flow.Slice(ctx, operators.Filter(slowPredicate).Apply(ctx, stream))
+values, err := flow.Slice(ctx, stream)
 if errors.Is(err, context.DeadlineExceeded) {
     log.Println("Operation timed out")
 }
@@ -397,34 +309,57 @@ if errors.Is(err, context.DeadlineExceeded) {
 
 ## Delegate System
 
-Extend functionality with delegates:
+Extend functionality with the delegate registry:
 
 ```go
-// Register an interceptor
-registry := core.NewRegistry()
-registry.Register(myInterceptor)
+// Create registry and add to context
+ctx, registry := core.WithRegistry(context.Background())
 
-// Propagate via context
-ctx := core.WithRegistry(ctx, registry)
+// Register interceptors for cross-cutting concerns
+registry.Register(&MetricsInterceptor{})
+registry.Register(&LoggingInterceptor{})
 
-// Interceptors receive events
-type MyInterceptor struct{}
+// Register configuration
+registry.Register(&parallel.ParallelConfig{Workers: 8})
+registry.Register(&aggregate.AggregateConfig{BatchSize: 100})
 
-func (i *MyInterceptor) Init() error { return nil }
-func (i *MyInterceptor) Close() error { return nil }
-func (i *MyInterceptor) OnEvent(event core.Event, data any) {
-    switch event {
-    case core.StreamStart:
-        log.Println("Stream started")
-    case core.StreamEnd:
-        log.Println("Stream ended")
-    }
+// Interceptor example
+type MetricsInterceptor struct {
+    count atomic.Int64
 }
+
+func (m *MetricsInterceptor) Events() []core.Event {
+    return []core.Event{core.ValueReceived}
+}
+
+func (m *MetricsInterceptor) Do(ctx context.Context, event core.Event, args ...any) error {
+    m.count.Add(1)
+    return nil
+}
+```
+
+## Development
+
+```bash
+# Build
+make build
+
+# Run tests with race detector
+make test
+
+# Run benchmarks
+make bench
+
+# Format, lint, and test
+make check
+
+# Run an example
+make run EXAMPLE=basic
 ```
 
 ## Project Status
 
-**ALPHA** - This project is under active development with no backward compatibility guarantees. Breaking changes are expected as the API evolves.
+**ALPHA** - This project is under active development with no backward compatibility guarantees. Breaking changes are expected as the API evolves toward a stable release.
 
 ## License
 

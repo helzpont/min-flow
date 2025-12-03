@@ -14,7 +14,7 @@ graph TB
         Compose[Composition]
         Terminal[Terminal Ops]
     end
-    
+
     subgraph "Subpackages"
         Core[core]
         Aggregate[aggregate]
@@ -26,7 +26,7 @@ graph TB
         Timing[timing]
         Transform[transform]
     end
-    
+
     Types --> Core
     Sources --> Types
     Compose --> Types
@@ -40,10 +40,10 @@ import "github.com/lguimbarda/min-flow/flow"
 
 func main() {
     ctx := context.Background()
-    
+
     // Create a stream from a slice
     stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-    
+
     // Transform: double even numbers
     doubled := flow.Map(func(n int) (int, error) {
         if n%2 == 0 {
@@ -51,7 +51,7 @@ func main() {
         }
         return n, nil
     }).Apply(ctx, stream)
-    
+
     // Collect results
     results, err := flow.Slice(ctx, doubled)
     // results: [1, 4, 3, 8, 5]
@@ -108,7 +108,7 @@ result = flow.Err[int](errors.New("failed"))
 // Stream interface
 var s flow.Stream[int]
 
-// Transformer interface  
+// Transformer interface
 var t flow.Transformer[int, string]
 
 // Function types
@@ -182,18 +182,18 @@ flow.ErrEndOfStream
 
 ## Package Organization
 
-| Package | Purpose |
-|---------|---------|
-| `flow` | Main API, sources, composition |
-| `flow/core` | Core abstractions (no external deps) |
-| `flow/aggregate` | Batching, reducing, windowing |
-| `flow/combine` | Merging, splitting, zipping |
-| `flow/filter` | Filtering, limiting, sampling |
+| Package           | Purpose                                |
+| ----------------- | -------------------------------------- |
+| `flow`            | Main API, sources, composition         |
+| `flow/core`       | Core abstractions (no external deps)   |
+| `flow/aggregate`  | Batching, reducing, windowing          |
+| `flow/combine`    | Merging, splitting, zipping            |
+| `flow/filter`     | Filtering, limiting, sampling          |
 | `flow/flowerrors` | Error handling, retry, circuit breaker |
-| `flow/observe` | Metrics, logging, debugging |
-| `flow/parallel` | Concurrent processing |
-| `flow/timing` | Delays, throttling, debouncing |
-| `flow/transform` | Utility transformations |
+| `flow/observe`    | Metrics, logging, debugging            |
+| `flow/parallel`   | Concurrent processing                  |
+| `flow/timing`     | Delays, throttling, debouncing         |
+| `flow/transform`  | Utility transformations                |
 
 ## Example Pipeline
 
