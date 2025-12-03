@@ -41,6 +41,42 @@ func benchmarkPipelineMinFlow(b *testing.B, size int) {
 	}
 }
 
+// MinFlow with multiple unfused mappers (3 stages with channels between)
+func BenchmarkPipeline_MinFlowUnfused_Large(b *testing.B) {
+	data := generateInts(LargeSize)
+	addOne := core.Map(func(x int) (int, error) { return x + 1, nil })
+	double := core.Map(func(x int) (int, error) { return x * 2, nil })
+	addTen := core.Map(func(x int) (int, error) { return x + 10, nil })
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		stream := flow.FromSlice(data)
+		s1 := addOne.Apply(ctx, stream)
+		s2 := double.Apply(ctx, s1)
+		s3 := addTen.Apply(ctx, s2)
+		reduced := aggregate.Reduce(add).Apply(ctx, s3)
+		_, _ = core.Slice(ctx, reduced)
+	}
+}
+
+// MinFlow with fused mappers (all 3 mappers in single stage)
+func BenchmarkPipeline_MinFlowFused_Large(b *testing.B) {
+	data := generateInts(LargeSize)
+	addOne := core.Map(func(x int) (int, error) { return x + 1, nil })
+	double := core.Map(func(x int) (int, error) { return x * 2, nil })
+	addTen := core.Map(func(x int) (int, error) { return x + 10, nil })
+	// Fuse all three: (x+1)*2+10
+	fused := core.Fuse(core.Fuse(addOne, double), addTen)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		stream := flow.FromSlice(data)
+		mapped := fused.Apply(ctx, stream)
+		reduced := aggregate.Reduce(add).Apply(ctx, mapped)
+		_, _ = core.Slice(ctx, reduced)
+	}
+}
+
 func BenchmarkPipeline_Rill_Small(b *testing.B) {
 	benchmarkPipelineRill(b, SmallSize)
 }

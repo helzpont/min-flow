@@ -104,6 +104,82 @@ func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...Tr
 	})
 }
 
+// Fuse combines two Mappers into a single Mapper that applies both transformations
+// sequentially without an intermediate channel or goroutine. This is an optimization
+// for CPU-bound transformations where the overhead of channel synchronization
+// outweighs the benefits of concurrency.
+//
+// Trade-offs:
+//   - Faster: No intermediate channel allocation or goroutine synchronization
+//   - Sequential: Both transformations run in the same goroutine
+//   - No intermediate buffering: Can't apply backpressure between fused stages
+//   - No intermediate observation: Can't intercept/log between fused mappers
+//
+// Use Fuse when:
+//   - Both mappers are CPU-bound (no I/O)
+//   - You don't need to observe intermediate values
+//   - Performance profiling shows channel overhead is significant
+func Fuse[IN, MID, OUT any](first Mapper[IN, MID], second Mapper[MID, OUT]) Mapper[IN, OUT] {
+	return func(res Result[IN]) (Result[OUT], error) {
+		mid, err := first(res)
+		if err != nil {
+			return Err[OUT](err), nil
+		}
+		return second(mid)
+	}
+}
+
+// Predicate is a function that tests a value and returns true if it passes the test.
+// It is used for filtering operations.
+type Predicate[T any] func(T) bool
+
+// ToFlatMapper converts a Mapper to a FlatMapper that produces exactly one output per input.
+func (m Mapper[IN, OUT]) ToFlatMapper() FlatMapper[IN, OUT] {
+	return func(res Result[IN]) ([]Result[OUT], error) {
+		out, err := m(res)
+		if err != nil {
+			return []Result[OUT]{Err[OUT](err)}, nil
+		}
+		return []Result[OUT]{out}, nil
+	}
+}
+
+// ToFlatMapper converts a Predicate to a FlatMapper that produces one output if the
+// predicate passes, or zero outputs if it fails.
+func (p Predicate[T]) ToFlatMapper() FlatMapper[T, T] {
+	return func(res Result[T]) ([]Result[T], error) {
+		if res.IsError() {
+			return []Result[T]{res}, nil
+		}
+		if p(res.Value()) {
+			return []Result[T]{res}, nil
+		}
+		return nil, nil // filtered out
+	}
+}
+
+// FuseFlat combines two FlatMappers into a single FlatMapper.
+// This is the universal fusion function - Mapper and Predicate can be converted
+// to FlatMapper using their ToFlatMapper() methods before fusing.
+func FuseFlat[IN, MID, OUT any](first FlatMapper[IN, MID], second FlatMapper[MID, OUT]) FlatMapper[IN, OUT] {
+	return func(res Result[IN]) ([]Result[OUT], error) {
+		mids, err := first(res)
+		if err != nil {
+			return []Result[OUT]{Err[OUT](err)}, nil
+		}
+		var outs []Result[OUT]
+		for _, mid := range mids {
+			midOuts, err := second(mid)
+			if err != nil {
+				outs = append(outs, Err[OUT](err))
+				continue
+			}
+			outs = append(outs, midOuts...)
+		}
+		return outs, nil
+	}
+}
+
 // FlatMapper defines a function that maps a Result of type IN to a Result containing a slice of Results of type OUT.
 // It represents a transformation that can change the cardinality of the flow (one input item can produce zero or more output items).
 // The flat mapper function is at the lowest level of abstraction in the flow processing pipeline.
