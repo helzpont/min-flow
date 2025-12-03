@@ -334,6 +334,7 @@ func CombineLatest[T any](streams ...core.Stream[T]) core.Stream[[]T] {
 					defer wg.Done()
 					for res := range s.Emit(ctx) {
 						if res.IsValue() {
+							shouldSignal := false
 							mu.Lock()
 							latest[idx] = res.Value()
 							hasValue[idx] = true
@@ -346,9 +347,10 @@ func CombineLatest[T any](streams ...core.Stream[T]) core.Stream[[]T] {
 									}
 								}
 							}
+							shouldSignal = allHaveValue
 							mu.Unlock()
 
-							if allHaveValue {
+							if shouldSignal {
 								select {
 								case updates <- struct{}{}:
 								default:
