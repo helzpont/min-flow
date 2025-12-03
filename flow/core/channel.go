@@ -41,3 +41,52 @@ func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[O
 		return t(ctx, in.Emit(ctx))
 	})
 }
+
+// Intercept creates a Transmitter that invokes interceptors for each item.
+// This is a low-level primitive used to enable interceptor-based observation
+// and error handling without creating explicit transformer stages.
+func Intercept[T any]() Transmitter[T, T] {
+	return Transmit(func(ctx context.Context, in <-chan Result[T]) <-chan Result[T] {
+		out := make(chan Result[T])
+
+		go func() {
+			defer close(out)
+
+			// Invoke stream start interceptors
+			_ = InvokeInterceptors(ctx, StreamStart)
+
+			defer func() {
+				// Invoke stream end interceptors
+				_ = InvokeInterceptors(ctx, StreamEnd)
+			}()
+
+			for res := range in {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				// Invoke item-level interceptors
+				_ = InvokeInterceptors(ctx, ItemReceived, res)
+
+				if res.IsValue() {
+					_ = InvokeInterceptors(ctx, ValueReceived, res.Value())
+				} else if res.IsError() {
+					_ = InvokeInterceptors(ctx, ErrorOccurred, res.Error())
+				} else if res.IsSentinel() {
+					_ = InvokeInterceptors(ctx, SentinelReceived, res.Error())
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				case out <- res:
+					_ = InvokeInterceptors(ctx, ItemEmitted, res)
+				}
+			}
+		}()
+
+		return out
+	})
+}

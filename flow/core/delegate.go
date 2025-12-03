@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -14,18 +15,56 @@ type Delegate interface {
 	Close() error
 }
 
+// Event represents a named occurrence in the stream processing lifecycle.
+// Events use a hierarchical naming convention with colons as separators
+// (e.g., "stream:start", "item:value").
 type Event string
 
-// TODO handle more complex event patterns
+// Stream lifecycle events
 const (
 	StreamStart Event = "stream:start"
 	StreamEnd   Event = "stream:end"
+)
 
-	// TODO use regex for wildcards?
+// Item-level events - fired for each item processed in a stream
+const (
+	// ItemReceived is fired when any item (value, error, or sentinel) is received
+	ItemReceived Event = "item:received"
+	// ItemEmitted is fired when any item is about to be emitted
+	ItemEmitted Event = "item:emitted"
+	// ValueReceived is fired when a successful value is received
+	ValueReceived Event = "value:received"
+	// ErrorOccurred is fired when an error result is received
+	ErrorOccurred Event = "error:occurred"
+	// SentinelReceived is fired when a sentinel is received
+	SentinelReceived Event = "sentinel:received"
+)
+
+// Event pattern wildcards for matching multiple events
+const (
 	AllEvents       = "*"
 	AllStreamEvents = "stream:*"
+	AllItemEvents   = "item:*"
 	AllStartEvents  = "*:start"
 )
+
+// Matches checks if an event matches a pattern.
+// Patterns can use "*" as a wildcard prefix or suffix.
+func (e Event) Matches(pattern string) bool {
+	if pattern == AllEvents {
+		return true
+	}
+	eventStr := string(e)
+	if strings.HasPrefix(pattern, "*") {
+		suffix := strings.TrimPrefix(pattern, "*")
+		return strings.HasSuffix(eventStr, suffix)
+	}
+	if strings.HasSuffix(pattern, "*") {
+		prefix := strings.TrimSuffix(pattern, "*")
+		return strings.HasPrefix(eventStr, prefix)
+	}
+	return eventStr == pattern
+}
 
 // Interceptor represents a component that can intercept events during
 // the flow processing. It extends the Delegate interface and adds a Do method
@@ -95,6 +134,19 @@ func (r *Registry) Get(id string) Delegate {
 	return r.items[id]
 }
 
+// Interceptors returns all registered interceptors in registration order.
+func (r *Registry) Interceptors() []Interceptor {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var interceptors []Interceptor
+	for _, key := range r.order {
+		if i, ok := r.items[key].(Interceptor); ok {
+			interceptors = append(interceptors, i)
+		}
+	}
+	return interceptors
+}
+
 type registryKey struct{}
 
 func WithRegistry(ctx context.Context) (context.Context, *Registry) {
@@ -104,6 +156,34 @@ func WithRegistry(ctx context.Context) (context.Context, *Registry) {
 		order: make([]string, 0),
 	}
 	return context.WithValue(ctx, registryKey{}, registry), registry
+}
+
+// GetRegistry retrieves the Registry from the context, if present.
+func GetRegistry(ctx context.Context) (*Registry, bool) {
+	registry, ok := ctx.Value(registryKey{}).(*Registry)
+	return registry, ok
+}
+
+// InvokeInterceptors invokes all interceptors matching the given event.
+// Interceptors are invoked in registration order.
+// If any interceptor returns an error, execution stops and the error is returned.
+func InvokeInterceptors(ctx context.Context, event Event, args ...any) error {
+	registry, ok := GetRegistry(ctx)
+	if !ok {
+		return nil
+	}
+
+	for _, interceptor := range registry.Interceptors() {
+		for _, pattern := range interceptor.Events() {
+			if event.Matches(string(pattern)) {
+				if err := interceptor.Do(ctx, event, args...); err != nil {
+					return err
+				}
+				break // Only invoke once per interceptor
+			}
+		}
+	}
+	return nil
 }
 
 func GetInterceptor[I Interceptor](ctx context.Context) (I, bool) {
