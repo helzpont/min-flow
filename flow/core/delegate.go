@@ -211,42 +211,34 @@ func InvokeInterceptors(ctx context.Context, event Event, args ...any) error {
 	return nil
 }
 
+// getDelegate is a generic helper that retrieves a delegate of type D from the registry.
+// It handles the common pattern of context lookup, registry access, and type assertion.
+func getDelegate[D Delegate](ctx context.Context) (D, bool) {
+	var zero D
+	registry, ok := GetRegistry(ctx)
+	if !ok {
+		return zero, false
+	}
+	delegate, ok := registry.Get(typeKey(zero)).(D)
+	return delegate, ok
+}
+
+// GetInterceptor retrieves a registered Interceptor of type I from the context.
 func GetInterceptor[I Interceptor](ctx context.Context) (I, bool) {
-	var zero I
-	registry, ok := ctx.Value(registryKey{}).(*Registry)
-	if !ok {
-		return zero, false
-	}
-	interceptor, ok := registry.Get(typeKey(zero)).(I)
-	return interceptor, ok
+	return getDelegate[I](ctx)
 }
 
+// GetProvider retrieves a registered Factory of type P from the context.
 func GetProvider[P Factory[T], T any](ctx context.Context) (P, bool) {
-	var zero P
-	registry, ok := ctx.Value(registryKey{}).(*Registry)
-	if !ok {
-		return zero, false
-	}
-	provider, ok := registry.Get(typeKey(zero)).(P)
-	return provider, ok
+	return getDelegate[P](ctx)
 }
 
+// GetConfig retrieves a registered Config of type C from the context.
 func GetConfig[C Config](ctx context.Context) (C, bool) {
-	var zero C
-	registry, ok := ctx.Value(registryKey{}).(*Registry)
-	if !ok {
-		return zero, false
-	}
-	config, ok := registry.Get(typeKey(zero)).(C)
-	return config, ok
+	return getDelegate[C](ctx)
 }
 
+// GetPool retrieves a registered Pool of type P from the context.
 func GetPool[P Pool[T], T any](ctx context.Context) (P, bool) {
-	var zero P
-	registry, ok := ctx.Value(registryKey{}).(*Registry)
-	if !ok {
-		return zero, false
-	}
-	pool, ok := registry.Get(typeKey(zero)).(P)
-	return pool, ok
+	return getDelegate[P](ctx)
 }

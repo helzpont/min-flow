@@ -42,6 +42,11 @@ type (
 // ErrEndOfStream is the sentinel error indicating normal stream termination.
 var ErrEndOfStream = core.ErrEndOfStream
 
+// DefaultBufferSize is the default buffer size for internal channels.
+// A small buffer reduces goroutine synchronization overhead without
+// consuming excessive memory. Used by Mapper, FlatMapper, and Intercept.
+const DefaultBufferSize = core.DefaultBufferSize
+
 // Result constructors - wrappers around core functions.
 
 // Ok creates a successful Result containing the given value.
@@ -79,6 +84,19 @@ func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) Mapper[IN, OUT] {
 // FlatMap creates a FlatMapper from a function returning a slice.
 func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) FlatMapper[IN, OUT] {
 	return core.FlatMap(flatMapFunc)
+}
+
+// Fuse combines two Mappers into a single Mapper that applies both transformations
+// sequentially without an intermediate channel or goroutine. This is an optimization
+// for CPU-bound transformations where channel overhead matters.
+func Fuse[IN, MID, OUT any](first Mapper[IN, MID], second Mapper[MID, OUT]) Mapper[IN, OUT] {
+	return core.Fuse(first, second)
+}
+
+// FuseFlat combines two FlatMappers into a single FlatMapper.
+// Mapper and Predicate can be converted to FlatMapper using ToFlatMapper() before fusing.
+func FuseFlat[IN, MID, OUT any](first FlatMapper[IN, MID], second FlatMapper[MID, OUT]) FlatMapper[IN, OUT] {
+	return core.FuseFlat(first, second)
 }
 
 // Terminal operations.
