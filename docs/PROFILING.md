@@ -9,15 +9,15 @@ This guide covers how to profile min-flow streams for both **development optimiz
 
 ## When to Use Each Approach
 
-| Goal | Tool | Why |
-|------|------|-----|
-| Find CPU hotspots | pprof | Zero-overhead sampling, flame graphs |
-| Find memory allocations | pprof heap | Tracks actual allocator calls |
-| Compare two implementations | pprof | Absolute numbers without observer effect |
-| Understand item flow | Interceptors | Counts values, errors, sentinels |
-| Monitor throughput patterns | Interceptors | Items/second, latency distribution |
-| Debug stream behavior | Interceptors | See what events fire and when |
-| Production monitoring | Interceptors | Integrates with metrics systems |
+| Goal                        | Tool         | Why                                      |
+| --------------------------- | ------------ | ---------------------------------------- |
+| Find CPU hotspots           | pprof        | Zero-overhead sampling, flame graphs     |
+| Find memory allocations     | pprof heap   | Tracks actual allocator calls            |
+| Compare two implementations | pprof        | Absolute numbers without observer effect |
+| Understand item flow        | Interceptors | Counts values, errors, sentinels         |
+| Monitor throughput patterns | Interceptors | Items/second, latency distribution       |
+| Debug stream behavior       | Interceptors | See what events fire and when            |
+| Production monitoring       | Interceptors | Integrates with metrics systems          |
 
 **Key Principle**: Use pprof when you need absolute performance numbers. Use interceptors when you need to understand stream behavior or for production monitoring where a small overhead is acceptable.
 
@@ -36,7 +36,7 @@ package benchmarks
 import (
     "context"
     "testing"
-    
+
     "github.com/lguimbarda/min-flow/flow"
     "github.com/lguimbarda/min-flow/flow/core"
     "github.com/lguimbarda/min-flow/flow/filter"
@@ -49,18 +49,18 @@ func BenchmarkPipelineProfile(b *testing.B) {
     for i := range data {
         data[i] = i
     }
-    
+
     double := core.Map(func(x int) (int, error) { return x * 2, nil })
     divisibleBy4 := filter.Where(func(x int) (bool, error) { return x%4 == 0, nil })
     addOne := core.Map(func(x int) (int, error) { return x + 1, nil })
-    
+
     b.ResetTimer()
     for i := 0; i < b.N; i++ {
         stream := flow.FromSlice(data)
         stream = double.Apply(ctx, stream)
         stream = divisibleBy4.Apply(ctx, stream)
         stream = addOne.Apply(ctx, stream)
-        
+
         _, _ = core.Slice(ctx, stream)
     }
 }
@@ -112,7 +112,7 @@ Use `-base` to compare before/after optimization:
 # Before optimization
 go test -bench=. -cpuprofile=before.prof ./benchmarks/
 
-# After optimization  
+# After optimization
 go test -bench=. -cpuprofile=after.prof ./benchmarks/
 
 # Compare
@@ -129,6 +129,7 @@ go tool trace trace.out
 ```
 
 This shows:
+
 - Goroutine creation/destruction
 - Channel operations
 - GC pauses
@@ -139,6 +140,7 @@ This shows:
 ## Part 2: Profiling with Interceptors
 
 Interceptors add overhead but provide semantic understanding of stream behavior. Use them for:
+
 - Understanding what your stream is doing
 - Relative comparisons (both runs have the same overhead)
 - Production monitoring
@@ -151,7 +153,7 @@ package main
 import (
     "context"
     "fmt"
-    
+
     "github.com/lguimbarda/min-flow/flow"
     "github.com/lguimbarda/min-flow/flow/core"
     "github.com/lguimbarda/min-flow/flow/observe"
@@ -159,18 +161,18 @@ import (
 
 func main() {
     ctx := context.Background()
-    
+
     // Create metrics interceptor with callback
     var finalMetrics observe.StreamMetrics
     metricsInterceptor := observe.NewMetricsInterceptor(func(m observe.StreamMetrics) {
         finalMetrics = m
     })
-    
+
     // Register interceptor
     registry := core.NewRegistry()
     registry.Register(metricsInterceptor)
     ctx = core.WithRegistry(ctx, registry)
-    
+
     // Run stream
     data := make([]int, 10000)
     for i := range data {
@@ -179,13 +181,13 @@ func main() {
     stream := flow.FromSlice(data)
     double := core.Map(func(x int) (int, error) { return x * 2, nil })
     stream = double.Apply(ctx, stream)
-    
+
     _, _ = core.Slice(ctx, stream)
-    
+
     // Report results
     fmt.Printf("Duration: %v\n", finalMetrics.Duration)
     fmt.Printf("Total Items: %d\n", finalMetrics.TotalItems)
-    fmt.Printf("Values: %d, Errors: %d, Sentinels: %d\n", 
+    fmt.Printf("Values: %d, Errors: %d, Sentinels: %d\n",
         finalMetrics.ValueCount, finalMetrics.ErrorCount, finalMetrics.SentinelCount)
     fmt.Printf("Items/sec: %.2f\n", finalMetrics.ItemsPerSecond)
     fmt.Printf("Avg Latency: %v\n", finalMetrics.AverageLatency)
@@ -233,7 +235,7 @@ func (l *LatencyInterceptor) Events() []core.Event {
 
 func (l *LatencyInterceptor) Do(ctx context.Context, event core.Event, args ...any) error {
     streamID := getStreamID(args)
-    
+
     switch event {
     case core.StreamStart:
         l.startTimes.Store(streamID, time.Now())
@@ -262,7 +264,7 @@ package benchmarks
 import (
     "context"
     "testing"
-    
+
     "github.com/lguimbarda/min-flow/flow"
     "github.com/lguimbarda/min-flow/flow/core"
     "github.com/lguimbarda/min-flow/flow/fast"
@@ -275,7 +277,7 @@ func BenchmarkCore(b *testing.B) {
         data[i] = i
     }
     double := core.Map(func(x int) (int, error) { return x * 2, nil })
-    
+
     b.ReportAllocs()
     b.ResetTimer()
     for i := 0; i < b.N; i++ {
@@ -292,7 +294,7 @@ func BenchmarkFast(b *testing.B) {
         data[i] = i
     }
     double := fast.Map(func(x int) int { return x * 2 })
-    
+
     b.ReportAllocs()
     b.ResetTimer()
     for i := 0; i < b.N; i++ {
@@ -313,7 +315,7 @@ func BenchmarkResultOverhead(b *testing.B) {
     for i := range data {
         data[i] = i
     }
-    
+
     b.ReportAllocs()
     b.ResetTimer()
     for i := 0; i < b.N; i++ {
@@ -328,7 +330,7 @@ func BenchmarkNoResultOverhead(b *testing.B) {
     for i := range data {
         data[i] = i
     }
-    
+
     b.ReportAllocs()
     b.ResetTimer()
     for i := 0; i < b.N; i++ {
@@ -394,11 +396,13 @@ benchstat baseline.txt after.txt
 ### Pattern 1: Allocation Hot Spots
 
 Look for in pprof:
+
 - `runtime.newobject` — heap allocations
 - `runtime.makeslice` — slice allocations
 - `runtime.makechan` — channel creation
 
 Solutions:
+
 - Pool objects with `sync.Pool`
 - Pre-allocate slices with capacity
 - Reduce channel buffer churn
@@ -406,10 +410,12 @@ Solutions:
 ### Pattern 2: Lock Contention
 
 Look for in trace:
+
 - Goroutines blocked on mutex
 - High "Sync block" time
 
 Solutions:
+
 - Use atomic operations
 - Reduce critical section size
 - Consider lock-free algorithms
@@ -417,10 +423,12 @@ Solutions:
 ### Pattern 3: GC Pressure
 
 Look for:
+
 - High `runtime.gcBgMarkWorker` in CPU profile
 - Frequent GC cycles in trace
 
 Solutions:
+
 - Reduce allocations
 - Use value types instead of pointers
 - Pool long-lived objects
@@ -428,10 +436,12 @@ Solutions:
 ### Pattern 4: Channel Overhead
 
 Look for:
+
 - `runtime.chansend` / `runtime.chanrecv`
 - Goroutines blocked on channel ops
 
 Solutions:
+
 - Use fusion to eliminate intermediate channels
 - Batch operations
 - Consider larger buffer sizes
@@ -441,29 +451,34 @@ Solutions:
 ## Quick Reference
 
 ### Run All Benchmarks with Memory Info
+
 ```bash
 go test -bench=. -benchmem ./benchmarks/
 ```
 
 ### CPU Profile Specific Benchmark
+
 ```bash
 go test -bench=BenchmarkName -cpuprofile=cpu.prof ./benchmarks/
 go tool pprof -http=:8080 cpu.prof
 ```
 
 ### Memory Profile
+
 ```bash
 go test -bench=BenchmarkName -memprofile=mem.prof ./benchmarks/
 go tool pprof -alloc_space mem.prof
 ```
 
 ### Execution Trace
+
 ```bash
 go test -bench=BenchmarkName -trace=trace.out ./benchmarks/
 go tool trace trace.out
 ```
 
 ### Compare Before/After
+
 ```bash
 go install golang.org/x/perf/cmd/benchstat@latest
 go test -bench=. -benchmem -count=10 ./benchmarks/ > before.txt

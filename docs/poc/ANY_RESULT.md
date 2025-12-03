@@ -68,31 +68,33 @@ The `any` interface type causes boxing overhead for value types, resulting in:
 
 Additional benchmarks revealed that **pointer types don't pay boxing overhead**:
 
-| Type             | Result[T]         | AnyResult         | Difference |
-| ---------------- | ----------------- | ----------------- | ---------- |
-| `int`            | 0.23 ns, 0 allocs | 5.20 ns, 0 allocs | **+22x**   |
-| `string`         | 0.22 ns, 0 allocs | 0.23 ns, 0 allocs | Same       |
-| `*int`           | 0.22 ns, 0 allocs | 0.23 ns, 0 allocs | Same       |
-| `[]int`          | 0.22 ns, 0 allocs | 10.6 ns, 1 alloc  | **+47x**   |
-| `LargeStruct`    | 3.81 ns, 0 allocs | 16.1 ns, 1 alloc  | **+4x**    |
-| `*LargeStruct`   | 0.22 ns, 0 allocs | 0.23 ns, 0 allocs | Same       |
+| Type           | Result[T]         | AnyResult         | Difference |
+| -------------- | ----------------- | ----------------- | ---------- |
+| `int`          | 0.23 ns, 0 allocs | 5.20 ns, 0 allocs | **+22x**   |
+| `string`       | 0.22 ns, 0 allocs | 0.23 ns, 0 allocs | Same       |
+| `*int`         | 0.22 ns, 0 allocs | 0.23 ns, 0 allocs | Same       |
+| `[]int`        | 0.22 ns, 0 allocs | 10.6 ns, 1 alloc  | **+47x**   |
+| `LargeStruct`  | 3.81 ns, 0 allocs | 16.1 ns, 1 alloc  | **+4x**    |
+| `*LargeStruct` | 0.22 ns, 0 allocs | 0.23 ns, 0 allocs | Same       |
 
 **Types that avoid boxing:**
+
 - Pointers (`*T`) - already fit in interface slot
 - Strings - header (ptr+len) representation matches interface layout
 - Other interface types
 
 **But this doesn't help because:**
 
-| Approach | Time | Memory | Allocs |
-|----------|------|--------|--------|
-| `Result[int]` direct | 0.23 ns | 0 B | 0 |
-| `Result[*int]` allocate each | 4.78 ns | 8 B | 1 |
-| `AnyResult` *int allocate each | 4.88 ns | 8 B | 1 |
+| Approach                        | Time    | Memory | Allocs |
+| ------------------------------- | ------- | ------ | ------ |
+| `Result[int]` direct            | 0.23 ns | 0 B    | 0      |
+| `Result[*int]` allocate each    | 4.78 ns | 8 B    | 1      |
+| `AnyResult` \*int allocate each | 4.88 ns | 8 B    | 1      |
 
 Using pointers to avoid boxing just **moves the allocation** to pointer creation. You'd still pay 1 allocation per item - the same cost as boxing!
 
 The only scenarios where this could help:
+
 1. **Data already exists as pointers** (rare in stream processing)
 2. **Pointer pooling** (complex, error-prone, marginal benefit)
 3. **Users explicitly choose pointer types** (bad API ergonomics)
