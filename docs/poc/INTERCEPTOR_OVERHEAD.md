@@ -27,6 +27,7 @@ invoke(ItemEmitted, res)
 ```
 
 **The Problem**: In Go, variadic parameters (`...any`) allocate a slice at the **call site**, not inside the function. This means every `invoke()` call allocates a slice, even when:
+
 1. There's no registry (`hasRegistry` is false)
 2. There are no interceptors registered
 3. The interceptor doesn't match the event
@@ -37,26 +38,26 @@ This caused ~60,000 allocations for processing 10,000 items, even when no interc
 
 ### Before Optimization (10,000 items)
 
-| Scenario | Time | Allocations | Overhead vs Baseline |
-|----------|------|-------------|----------------------|
-| No intercept (baseline) | 1.89ms | 31 | - |
-| With intercept, no interceptors | 4.28ms | 59,914 | +126% time, +1933x allocs |
-| With intercept, 1 counting | 5.08ms | 59,921 | +169% time |
+| Scenario                        | Time   | Allocations | Overhead vs Baseline      |
+| ------------------------------- | ------ | ----------- | ------------------------- |
+| No intercept (baseline)         | 1.89ms | 31          | -                         |
+| With intercept, no interceptors | 4.28ms | 59,914      | +126% time, +1933x allocs |
+| With intercept, 1 counting      | 5.08ms | 59,921      | +169% time                |
 
 ### After Optimization (10,000 items)
 
-| Scenario | Time | Allocations | Overhead vs Baseline |
-|----------|------|-------------|----------------------|
-| No intercept (baseline) | 1.89ms | 31 | - |
-| With intercept, no interceptors | 2.77ms | 41 | +47% time, +10 allocs |
-| With intercept, 1 counting | 4.87ms | 49,921 | +158% time |
+| Scenario                        | Time   | Allocations | Overhead vs Baseline  |
+| ------------------------------- | ------ | ----------- | --------------------- |
+| No intercept (baseline)         | 1.89ms | 31          | -                     |
+| With intercept, no interceptors | 2.77ms | 41          | +47% time, +10 allocs |
+| With intercept, 1 counting      | 4.87ms | 49,921      | +158% time            |
 
 ### Improvement Summary
 
-| Scenario | Time Improvement | Allocation Reduction |
-|----------|------------------|----------------------|
-| No interceptors registered | **35% faster** | **99.93% fewer** (59,914 → 41) |
-| With interceptors | ~2% faster | ~17% fewer |
+| Scenario                   | Time Improvement | Allocation Reduction           |
+| -------------------------- | ---------------- | ------------------------------ |
+| No interceptors registered | **35% faster**   | **99.93% fewer** (59,914 → 41) |
+| With interceptors          | ~2% faster       | ~17% fewer                     |
 
 ## Solution
 
@@ -137,6 +138,7 @@ When interceptors are actually present and being called, allocations still occur
 2. **Interceptor.Do() variadic**: The interface method `Do(ctx, event, ...any)` still allocates
 
 These are **unavoidable given the current interface design**. However, this is acceptable because:
+
 - You're paying for functionality you're actually using
 - The overhead is proportional to the number of interceptors × items processed
 
@@ -145,6 +147,7 @@ These are **unavoidable given the current interface design**. However, this is a
 If the remaining allocations become problematic, consider:
 
 1. **Typed Interceptor interfaces**: Separate interfaces for different event signatures
+
    ```go
    type ItemInterceptor interface {
        DoItem(ctx context.Context, event Event, item any) error
@@ -158,6 +161,7 @@ If the remaining allocations become problematic, consider:
 ## Conclusion
 
 The optimization is **highly effective** for the common case (no interceptors or empty registry):
+
 - **99.93% reduction** in allocations
 - **35% faster** throughput
 

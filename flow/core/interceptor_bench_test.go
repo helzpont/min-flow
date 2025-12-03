@@ -27,11 +27,11 @@ func NewNoOpInterceptor(events ...Event) *NoOpInterceptor {
 	return &NoOpInterceptor{events: events}
 }
 
-func (n *NoOpInterceptor) Init() error                                  { return nil }
-func (n *NoOpInterceptor) Close() error                                 { return nil }
-func (n *NoOpInterceptor) Events() []Event                              { return n.events }
+func (n *NoOpInterceptor) Init() error                                   { return nil }
+func (n *NoOpInterceptor) Close() error                                  { return nil }
+func (n *NoOpInterceptor) Events() []Event                               { return n.events }
 func (n *NoOpInterceptor) Do(_ context.Context, _ Event, _ ...any) error { n.calls.Add(1); return nil }
-func (n *NoOpInterceptor) Calls() int64                                 { return n.calls.Load() }
+func (n *NoOpInterceptor) Calls() int64                                  { return n.calls.Load() }
 
 // CountingInterceptor counts invocations per event type
 type CountingInterceptor struct {
