@@ -12,8 +12,8 @@ type mockInterceptor struct {
 	events []Event
 }
 
-func (m *mockInterceptor) Init() error   { return nil }
-func (m *mockInterceptor) Close() error  { return nil }
+func (m *mockInterceptor) Init() error     { return nil }
+func (m *mockInterceptor) Close() error    { return nil }
 func (m *mockInterceptor) Events() []Event { return m.events }
 func (m *mockInterceptor) Do(ctx context.Context, event Event, args ...any) error {
 	return nil
@@ -23,8 +23,8 @@ type mockFactory[T any] struct {
 	value T
 }
 
-func (m *mockFactory[T]) Init() error           { return nil }
-func (m *mockFactory[T]) Close() error          { return nil }
+func (m *mockFactory[T]) Init() error                { return nil }
+func (m *mockFactory[T]) Close() error               { return nil }
 func (m *mockFactory[T]) New(args ...any) (T, error) { return m.value, nil }
 
 type mockPool[T any] struct {

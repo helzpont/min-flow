@@ -818,6 +818,7 @@ func TestFlatMap_PanicRecovery(t *testing.T) {
 
 func TestMapper_ApplyWith_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	slowMapper := Map(func(x int) (int, error) {
 		return x * 2, nil
@@ -864,6 +865,7 @@ func TestMapper_ApplyWith_ContextCancellation(t *testing.T) {
 
 func TestFlatMapper_ApplyWith_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	flatMapper := FlatMap(func(x int) ([]int, error) {
 		return []int{x, x * 10}, nil
@@ -912,6 +914,7 @@ func TestFlatMapper_ApplyWith_ContextCancellation(t *testing.T) {
 func TestMapper_ApplyWith_ContextCancelDuringSend(t *testing.T) {
 	// This test covers the ctx.Done case in the select that sends to outChan
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	mapper := Map(func(x int) (int, error) {
 		return x * 2, nil
@@ -949,6 +952,7 @@ func TestMapper_ApplyWith_ContextCancelDuringSend(t *testing.T) {
 
 func TestFlatMapper_ApplyWith_ContextCancelDuringSend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	flatMapper := FlatMap(func(x int) ([]int, error) {
 		return []int{x, x + 100}, nil
