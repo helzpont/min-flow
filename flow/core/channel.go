@@ -46,10 +46,10 @@ func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[O
 // This is a low-level primitive used to enable interceptor-based observation
 // and error handling without creating explicit transformer stages.
 //
-// For high-throughput scenarios, consider using InterceptBuffered which
-// reduces channel synchronization overhead.
+// Uses a default buffer size of 64 to balance throughput and backpressure.
+// For strict backpressure (unbuffered), use InterceptBuffered(0).
 func Intercept[T any]() Transmitter[T, T] {
-	return InterceptBuffered[T](0)
+	return InterceptBuffered[T](64)
 }
 
 // InterceptBuffered creates an Intercept transmitter with buffered output channel.

@@ -116,17 +116,19 @@ Interceptors enable cross-cutting concerns but add overhead per item.
 
 ### Per-Item Cost (10K items)
 
-| Configuration      | Time   | Per-Item |
-| ------------------ | ------ | -------- |
-| Baseline           | 650μs  | ~65ns    |
-| With 1 interceptor | 10.0ms | ~1μs     |
+| Configuration      | Time   | Per-Item | Notes                        |
+| ------------------ | ------ | -------- | ---------------------------- |
+| Baseline           | 650μs  | ~65ns    |                              |
+| With 1 interceptor | 5.9ms  | ~590ns   | Default (buffered, size=64)  |
+| Unbuffered         | 7.8ms  | ~780ns   | Strict backpressure mode     |
 
 **Observations**:
 
-- Interceptor dispatch adds ~1μs per item with 1 interceptor
+- Interceptor dispatch adds ~590ns per item with 1 interceptor (default buffer=64)
 - Cost scales approximately linearly with interceptor count
-- Most overhead is from InvokeInterceptors call per item
-- Consider batching or sampling for high-throughput scenarios
+- 78% of overhead is goroutine scheduling, not interceptor logic
+- Default buffer size of 64 provides 41% speedup over unbuffered
+- Consider batching or sampling for ultra-high-throughput scenarios
 
 ### Event Matching Performance
 
