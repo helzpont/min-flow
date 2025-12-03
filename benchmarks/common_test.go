@@ -4,8 +4,12 @@ package benchmarks
 
 import (
 	"context"
+	"errors"
 	"strconv"
 )
+
+// Common test errors
+var errTest = errors.New("test error")
 
 // Test data sizes
 const (
