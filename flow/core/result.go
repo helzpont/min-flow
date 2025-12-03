@@ -3,16 +3,89 @@ package core
 import (
 	"errors"
 	"fmt"
+	"runtime"
+	"strings"
 )
 
 // ErrPanic wraps a recovered panic value as an error.
 // This is used when a user-provided function panics during stream processing.
+// It includes a cleaned-up stack trace that excludes internal min-flow frames.
 type ErrPanic struct {
 	Value any
+	Stack string // Cleaned stack trace
 }
 
 func (e ErrPanic) Error() string {
+	if e.Stack != "" {
+		return fmt.Sprintf("panic: %v\n%s", e.Value, e.Stack)
+	}
 	return fmt.Sprintf("panic: %v", e.Value)
+}
+
+// NewPanicError creates an ErrPanic from a recovered value with a cleaned stack trace.
+// It captures the current stack and removes internal min-flow frames to show only
+// user code, making it easier to identify where the panic originated.
+func NewPanicError(recovered any) ErrPanic {
+	return ErrPanic{
+		Value: recovered,
+		Stack: cleanStack(captureStack(4)), // skip: runtime.Callers, captureStack, NewPanicError, defer func
+	}
+}
+
+// captureStack returns the current stack trace as a string.
+func captureStack(skip int) string {
+	const maxFrames = 32
+	var pcs [maxFrames]uintptr
+	n := runtime.Callers(skip, pcs[:])
+	if n == 0 {
+		return ""
+	}
+
+	frames := runtime.CallersFrames(pcs[:n])
+	var sb strings.Builder
+
+	for {
+		frame, more := frames.Next()
+		fmt.Fprintf(&sb, "%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line)
+		if !more {
+			break
+		}
+	}
+
+	return sb.String()
+}
+
+// cleanStack removes internal min-flow frames from a stack trace.
+// It keeps user code and standard library frames while filtering out
+// github.com/lguimbarda/min-flow internal frames.
+func cleanStack(stack string) string {
+	lines := strings.Split(stack, "\n")
+	var result []string
+	var skipNext bool
+
+	for _, line := range lines {
+		// Skip empty lines
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		// Check if this is a function line (not a file:line)
+		if !strings.HasPrefix(line, "\t") {
+			// Skip internal min-flow frames
+			if strings.Contains(line, "github.com/lguimbarda/min-flow/flow/") {
+				skipNext = true
+				continue
+			}
+			skipNext = false
+		} else if skipNext {
+			// Skip the file:line that follows a skipped function
+			continue
+		}
+
+		result = append(result, line)
+	}
+
+	return strings.Join(result, "\n")
 }
 
 // Result represents the outcome of processing an item in the stream.

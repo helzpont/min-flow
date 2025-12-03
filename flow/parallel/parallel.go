@@ -74,12 +74,7 @@ func Map[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
 func safeMap[IN, OUT any](mapper func(IN) OUT, value IN) (result core.Result[OUT]) {
 	defer func() {
 		if r := recover(); r != nil {
-			switch e := r.(type) {
-			case error:
-				result = core.Err[OUT](e)
-			default:
-				result = core.Err[OUT](core.ErrPanic{Value: e})
-			}
+			result = core.Err[OUT](core.NewPanicError(r))
 		}
 	}()
 	return core.Ok(mapper(value))
@@ -160,12 +155,7 @@ func FlatMap[IN, OUT any](n int, flatMapper func(IN) []OUT) core.Transformer[IN,
 func safeFlatMap[IN, OUT any](flatMapper func(IN) []OUT, value IN) (results []core.Result[OUT]) {
 	defer func() {
 		if r := recover(); r != nil {
-			switch e := r.(type) {
-			case error:
-				results = []core.Result[OUT]{core.Err[OUT](e)}
-			default:
-				results = []core.Result[OUT]{core.Err[OUT](core.ErrPanic{Value: e})}
-			}
+			results = []core.Result[OUT]{core.Err[OUT](core.NewPanicError(r))}
 		}
 	}()
 

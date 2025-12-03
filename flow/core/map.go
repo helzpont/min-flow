@@ -84,7 +84,7 @@ func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) Mapper[IN, OUT] {
 	return func(res Result[IN]) (out Result[OUT], err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = fmt.Errorf("panic in Map function: %v", r)
+				err = NewPanicError(r)
 			}
 		}()
 
@@ -220,7 +220,7 @@ func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) FlatMapper[IN, OU
 	return func(res Result[IN]) (outs []Result[OUT], err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = fmt.Errorf("panic in FlatMap function: %v", r)
+				err = NewPanicError(r)
 			}
 		}()
 

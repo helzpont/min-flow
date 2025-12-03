@@ -2,7 +2,6 @@ package combine
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/lguimbarda/min-flow/flow/core"
@@ -12,7 +11,7 @@ import (
 func safeMap[IN, OUT any](mapper func(IN) OUT, value IN) (result core.Result[OUT]) {
 	defer func() {
 		if r := recover(); r != nil {
-			result = core.Err[OUT](fmt.Errorf("panic in mapper: %v", r))
+			result = core.Err[OUT](core.NewPanicError(r))
 		}
 	}()
 	return core.Ok(mapper(value))
