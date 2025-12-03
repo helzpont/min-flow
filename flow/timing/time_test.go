@@ -71,7 +71,7 @@ func TestTimeoutWithError(t *testing.T) {
 		}()
 
 		stream := flow.FromChannel(ch)
-		result := timing.TimeoutWithError[int](50*time.Millisecond, customErr).Apply(ctx, stream)
+		result := timing.AfterWithError[int](50*time.Millisecond, customErr).Apply(ctx, stream)
 		_, err := flow.Slice(ctx, result)
 
 		if !errors.Is(err, customErr) {
@@ -84,7 +84,7 @@ func TestTimeoutWithError(t *testing.T) {
 		customErr := errors.New("custom timeout")
 		stream := flow.FromSlice([]int{1, 2, 3})
 
-		result := timing.TimeoutWithError[int](1*time.Second, customErr).Apply(ctx, stream)
+		result := timing.AfterWithError[int](1*time.Second, customErr).Apply(ctx, stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -155,7 +155,7 @@ func TestTimer(t *testing.T) {
 		ctx := context.Background()
 
 		start := time.Now()
-		stream := timing.Timer(50 * time.Millisecond)
+		stream := timing.Once(50 * time.Millisecond)
 		got, err := flow.Slice(ctx, stream)
 		elapsed := time.Since(start)
 
@@ -175,7 +175,7 @@ func TestTimer(t *testing.T) {
 	t.Run("cancellation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
-		stream := timing.Timer(1 * time.Second)
+		stream := timing.Once(1 * time.Second)
 		ch := stream.Emit(ctx)
 
 		cancel()
@@ -193,7 +193,7 @@ func TestTimer(t *testing.T) {
 func TestTimerWithValue(t *testing.T) {
 	ctx := context.Background()
 
-	stream := timing.TimerWithValue(50*time.Millisecond, "hello")
+	stream := timing.OnceWith(50*time.Millisecond, "hello")
 	got, err := flow.Slice(ctx, stream)
 
 	if err != nil {
@@ -210,7 +210,7 @@ func TestTimestamp(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3})
 
 	start := time.Now()
-	result := timing.Timestamp[int]().Apply(ctx, stream)
+	result := timing.Stamped[int]().Apply(ctx, stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -246,7 +246,7 @@ func TestTimestampPassesErrors(t *testing.T) {
 		return out
 	})
 
-	result := timing.Timestamp[int]().Apply(ctx, emitter)
+	result := timing.Stamped[int]().Apply(ctx, emitter)
 
 	var values []int
 	var gotErr error
@@ -282,7 +282,7 @@ func TestTimeIntervalOp(t *testing.T) {
 	}()
 
 	stream := flow.FromChannel(ch)
-	result := timing.TimeIntervalOp[int]().Apply(ctx, stream)
+	result := timing.Elapsed[int]().Apply(ctx, stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {

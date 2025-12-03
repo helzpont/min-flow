@@ -7,10 +7,10 @@ import (
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
-// Parallel creates a Transformer that processes items concurrently using n workers.
+// Map creates a Transformer that processes items concurrently using n workers.
 // Each worker applies the given mapper function. Results may arrive out of order.
 // If n <= 0, defaults to 1 worker.
-func Parallel[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
+func Map[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
 	if n <= 0 {
 		n = 1
 	}
@@ -85,15 +85,16 @@ func safeMap[IN, OUT any](mapper func(IN) OUT, value IN) (result *core.Result[OU
 	return core.Ok(mapper(value))
 }
 
-// ParallelMap is an alias for Parallel - processes items concurrently with n workers.
+// ParallelMap is a deprecated alias for Map - use Map instead.
+// Deprecated: Use Map instead.
 func ParallelMap[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
-	return Parallel(n, mapper)
+	return Map(n, mapper)
 }
 
-// ParallelFlatMap creates a Transformer that applies a flatMapper concurrently using n workers.
+// FlatMap creates a Transformer that applies a flatMapper concurrently using n workers.
 // Each worker can emit zero or more results per input. Results may arrive out of order.
 // If n <= 0, defaults to 1 worker.
-func ParallelFlatMap[IN, OUT any](n int, flatMapper func(IN) []OUT) core.Transformer[IN, OUT] {
+func FlatMap[IN, OUT any](n int, flatMapper func(IN) []OUT) core.Transformer[IN, OUT] {
 	if n <= 0 {
 		n = 1
 	}
@@ -176,11 +177,11 @@ func safeFlatMap[IN, OUT any](flatMapper func(IN) []OUT, value IN) (results []*c
 	return results
 }
 
-// ParallelOrdered creates a Transformer that processes items concurrently but preserves order.
+// Ordered creates a Transformer that processes items concurrently but preserves order.
 // Uses a sliding window approach: processes up to n items in parallel while maintaining
-// input order in the output. More expensive than Parallel but guarantees ordering.
+// input order in the output. More expensive than Map but guarantees ordering.
 // If n <= 0, defaults to 1 worker.
-func ParallelOrdered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
+func Ordered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
 	if n <= 0 {
 		n = 1
 	}

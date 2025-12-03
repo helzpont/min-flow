@@ -98,10 +98,10 @@ func ThrottleWithTrailing[T any](d time.Duration) core.Transformer[T, T] {
 	})
 }
 
-// TimeoutWithError creates a Transformer that emits a custom error if no item
-// is received within the specified duration. This extends Timeout by allowing
+// AfterWithError creates a Transformer that emits a custom error if no item
+// is received within the specified duration. This extends After by allowing
 // a custom error type.
-func TimeoutWithError[T any](d time.Duration, timeoutErr error) core.Transformer[T, T] {
+func AfterWithError[T any](d time.Duration, timeoutErr error) core.Transformer[T, T] {
 	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
 		out := make(chan *core.Result[T])
 		go func() {
@@ -178,9 +178,9 @@ func Interval(d time.Duration) core.Emitter[int] {
 	})
 }
 
-// Timer creates an Emitter that emits a single value (0) after the specified duration,
+// Once creates an Emitter that emits a single value (0) after the specified duration,
 // then completes.
-func Timer(d time.Duration) core.Emitter[int] {
+func Once(d time.Duration) core.Emitter[int] {
 	return core.Emitter[int](func(ctx context.Context) <-chan *core.Result[int] {
 		out := make(chan *core.Result[int])
 		go func() {
@@ -203,9 +203,9 @@ func Timer(d time.Duration) core.Emitter[int] {
 	})
 }
 
-// TimerWithValue creates an Emitter that emits the specified value after the
+// OnceWith creates an Emitter that emits the specified value after the
 // specified duration, then completes.
-func TimerWithValue[T any](d time.Duration, value T) core.Emitter[T] {
+func OnceWith[T any](d time.Duration, value T) core.Emitter[T] {
 	return core.Emitter[T](func(ctx context.Context) <-chan *core.Result[T] {
 		out := make(chan *core.Result[T])
 		go func() {
@@ -234,8 +234,8 @@ type Timestamped[T any] struct {
 	Timestamp time.Time
 }
 
-// Timestamp creates a Transformer that wraps each item with the time it was received.
-func Timestamp[T any]() core.Transformer[T, Timestamped[T]] {
+// Stamped creates a Transformer that wraps each item with the time it was received.
+func Stamped[T any]() core.Transformer[T, Timestamped[T]] {
 	return core.Transmitter[T, Timestamped[T]](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[Timestamped[T]] {
 		out := make(chan *core.Result[Timestamped[T]])
 		go func() {
@@ -280,9 +280,9 @@ type TimeInterval[T any] struct {
 	Interval time.Duration
 }
 
-// TimeIntervalOp creates a Transformer that wraps each item with the duration since
+// Elapsed creates a Transformer that wraps each item with the duration since
 // the previous emission (or since stream start for the first item).
-func TimeIntervalOp[T any]() core.Transformer[T, TimeInterval[T]] {
+func Elapsed[T any]() core.Transformer[T, TimeInterval[T]] {
 	return core.Transmitter[T, TimeInterval[T]](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[TimeInterval[T]] {
 		out := make(chan *core.Result[TimeInterval[T]])
 		go func() {

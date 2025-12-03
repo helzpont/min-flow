@@ -53,7 +53,7 @@ func TestParallel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			doubled := parallel.Parallel(tt.workers, func(n int) int {
+			doubled := parallel.Map(tt.workers, func(n int) int {
 				return n * 2
 			}).Apply(ctx, stream)
 
@@ -82,7 +82,7 @@ func TestParallelOrdered(t *testing.T) {
 	input := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	stream := flow.FromSlice(input)
 
-	doubled := parallel.ParallelOrdered(4, func(n int) int {
+	doubled := parallel.Ordered(4, func(n int) int {
 		// Add some jitter to test ordering
 		time.Sleep(time.Duration(n%3) * time.Millisecond)
 		return n * 2
@@ -109,7 +109,7 @@ func TestParallelFlatMap(t *testing.T) {
 	ctx := context.Background()
 	stream := flow.FromSlice([]int{1, 2, 3})
 
-	expanded := parallel.ParallelFlatMap(2, func(n int) []int {
+	expanded := parallel.FlatMap(2, func(n int) []int {
 		result := make([]int, n)
 		for i := 0; i < n; i++ {
 			result[i] = n
@@ -143,7 +143,7 @@ func TestParallelContextCancellation(t *testing.T) {
 
 	var processed int32
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	doubled := parallel.Parallel(4, func(n int) int {
+	doubled := parallel.Map(4, func(n int) int {
 		atomic.AddInt32(&processed, 1)
 		time.Sleep(50 * time.Millisecond)
 		return n * 2
@@ -167,7 +167,7 @@ func TestParallelPanicRecovery(t *testing.T) {
 	ctx := context.Background()
 	stream := flow.FromSlice([]int{1, 2, 3})
 
-	result := parallel.Parallel(2, func(n int) int {
+	result := parallel.Map(2, func(n int) int {
 		if n == 2 {
 			panic("intentional panic")
 		}

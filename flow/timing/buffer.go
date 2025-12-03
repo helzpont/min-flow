@@ -407,9 +407,9 @@ func Sample[T any](interval time.Duration) core.Transformer[T, T] {
 	})
 }
 
-// Timeout creates a Transformer that errors if no item is received within the duration.
+// After creates a Transformer that errors if no item is received within the duration.
 // The timeout resets after each item. If the timeout expires, an error is emitted.
-func Timeout[T any](duration time.Duration) core.Transformer[T, T] {
+func After[T any](duration time.Duration) core.Transformer[T, T] {
 	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
 		out := make(chan *core.Result[T])
 

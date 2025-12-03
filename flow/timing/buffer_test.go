@@ -266,7 +266,7 @@ func TestTimeout(t *testing.T) {
 			})
 
 			// Timeout is a Transformer
-			timedOut := timing.Timeout[int](tt.timeout).Apply(ctx, stream)
+			timedOut := timing.After[int](tt.timeout).Apply(ctx, stream)
 
 			result, err := flow.Slice(ctx, timedOut)
 

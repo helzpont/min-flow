@@ -16,7 +16,7 @@ func main() {
 	numbers := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
 	// Filter to keep only even numbers
-	evens := filter.Filter(func(n int) bool {
+	evens := filter.Where(func(n int) bool {
 		return n%2 == 0
 	}).Apply(ctx, numbers)
 
@@ -35,7 +35,7 @@ func main() {
 
 	// Example with chained transformers using Apply
 	numbers2 := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	filtered := filter.Filter(func(n int) bool { return n > 5 }).Apply(ctx, numbers2)
+	filtered := filter.Where(func(n int) bool { return n > 5 }).Apply(ctx, numbers2)
 	taken := filter.Take[int](3).Apply(ctx, filtered)
 	result2, _ := flow.Slice(ctx, taken)
 	fmt.Println("First 3 numbers > 5:", result2)
