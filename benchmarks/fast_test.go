@@ -20,6 +20,7 @@ func BenchmarkFastVsCore_Map(b *testing.B) {
 
 	b.Run("core.Map", func(b *testing.B) {
 		mapper := core.Map(squareWithErr)
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
@@ -30,6 +31,7 @@ func BenchmarkFastVsCore_Map(b *testing.B) {
 
 	b.Run("fast.Map", func(b *testing.B) {
 		mapper := fast.Map(square)
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -44,6 +46,7 @@ func BenchmarkFastVsCore_MapFilterReduce(b *testing.B) {
 	data := generateInts(LargeSize)
 
 	b.Run("core.Pipeline", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
@@ -55,6 +58,7 @@ func BenchmarkFastVsCore_MapFilterReduce(b *testing.B) {
 	})
 
 	b.Run("fast.Pipeline", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -75,6 +79,7 @@ func BenchmarkFastVsCore_Fused(b *testing.B) {
 		double := core.Map(func(x int) (int, error) { return x * 2, nil })
 		addTen := core.Map(func(x int) (int, error) { return x + 10, nil })
 		fused := core.Fuse(core.Fuse(addOne, double), addTen)
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
@@ -88,6 +93,7 @@ func BenchmarkFastVsCore_Fused(b *testing.B) {
 		double := fast.Map(func(x int) int { return x * 2 })
 		addTen := fast.Map(func(x int) int { return x + 10 })
 		fused := fast.Fuse(fast.Fuse(addOne, double), addTen)
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -102,6 +108,7 @@ func BenchmarkFastVsCore_LongChain(b *testing.B) {
 	data := generateInts(LargeSize)
 
 	b.Run("core.LongChain", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
@@ -115,6 +122,7 @@ func BenchmarkFastVsCore_LongChain(b *testing.B) {
 	})
 
 	b.Run("fast.LongChain", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -137,6 +145,7 @@ func BenchmarkOverhead_ResultWrapping(b *testing.B) {
 	data := generateInts(LargeSize)
 
 	b.Run("direct_values", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -145,6 +154,7 @@ func BenchmarkOverhead_ResultWrapping(b *testing.B) {
 	})
 
 	b.Run("result_wrapped", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
@@ -159,6 +169,7 @@ func BenchmarkOverhead_PanicRecovery(b *testing.B) {
 
 	b.Run("no_recovery", func(b *testing.B) {
 		mapper := fast.Map(square)
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -169,6 +180,7 @@ func BenchmarkOverhead_PanicRecovery(b *testing.B) {
 
 	b.Run("with_recovery", func(b *testing.B) {
 		mapper := core.Map(squareWithErr)
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
@@ -183,6 +195,7 @@ func BenchmarkOverhead_ErrorSignature(b *testing.B) {
 	data := generateInts(LargeSize)
 
 	b.Run("no_error_return", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -192,6 +205,7 @@ func BenchmarkOverhead_ErrorSignature(b *testing.B) {
 	})
 
 	b.Run("with_error_return", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
@@ -208,6 +222,7 @@ func BenchmarkOverhead_ContextCheck(b *testing.B) {
 	data := generateInts(LargeSize)
 
 	b.Run("fast", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
@@ -216,6 +231,7 @@ func BenchmarkOverhead_ContextCheck(b *testing.B) {
 	})
 
 	b.Run("core", func(b *testing.B) {
+		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
