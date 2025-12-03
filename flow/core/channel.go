@@ -45,19 +45,56 @@ func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[O
 // Intercept creates a Transmitter that invokes interceptors for each item.
 // This is a low-level primitive used to enable interceptor-based observation
 // and error handling without creating explicit transformer stages.
+//
+// For high-throughput scenarios, consider using InterceptBuffered which
+// reduces channel synchronization overhead.
 func Intercept[T any]() Transmitter[T, T] {
+	return InterceptBuffered[T](0)
+}
+
+// InterceptBuffered creates an Intercept transmitter with buffered output channel.
+// A buffer size of 0 uses an unbuffered channel (same as Intercept).
+// Larger buffers reduce goroutine synchronization overhead at the cost of memory.
+//
+// Recommended buffer sizes:
+//   - 0: Strict backpressure, highest latency
+//   - 16-64: Good balance for most use cases
+//   - 256+: High-throughput scenarios
+func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 	return Transmit(func(ctx context.Context, in <-chan Result[T]) <-chan Result[T] {
-		out := make(chan Result[T])
+		out := make(chan Result[T], bufferSize)
 
 		go func() {
 			defer close(out)
 
+			// Cache registry lookup - this is the key optimization
+			registry, hasRegistry := GetRegistry(ctx)
+			var interceptors []Interceptor
+			if hasRegistry {
+				interceptors = registry.Interceptors()
+			}
+
+			// Helper to invoke matching interceptors without repeated lookups
+			invoke := func(event Event, args ...any) {
+				if !hasRegistry {
+					return
+				}
+				for _, interceptor := range interceptors {
+					for _, pattern := range interceptor.Events() {
+						if event.Matches(string(pattern)) {
+							_ = interceptor.Do(ctx, event, args...)
+							break
+						}
+					}
+				}
+			}
+
 			// Invoke stream start interceptors
-			_ = InvokeInterceptors(ctx, StreamStart)
+			invoke(StreamStart)
 
 			defer func() {
 				// Invoke stream end interceptors
-				_ = InvokeInterceptors(ctx, StreamEnd)
+				invoke(StreamEnd)
 			}()
 
 			for res := range in {
@@ -68,21 +105,21 @@ func Intercept[T any]() Transmitter[T, T] {
 				}
 
 				// Invoke item-level interceptors
-				_ = InvokeInterceptors(ctx, ItemReceived, res)
+				invoke(ItemReceived, res)
 
 				if res.IsValue() {
-					_ = InvokeInterceptors(ctx, ValueReceived, res.Value())
+					invoke(ValueReceived, res.Value())
 				} else if res.IsError() {
-					_ = InvokeInterceptors(ctx, ErrorOccurred, res.Error())
+					invoke(ErrorOccurred, res.Error())
 				} else if res.IsSentinel() {
-					_ = InvokeInterceptors(ctx, SentinelReceived, res.Error())
+					invoke(SentinelReceived, res.Error())
 				}
 
 				select {
 				case <-ctx.Done():
 					return
 				case out <- res:
-					_ = InvokeInterceptors(ctx, ItemEmitted, res)
+					invoke(ItemEmitted, res)
 				}
 			}
 		}()

@@ -110,6 +110,10 @@ type Registry struct {
 	mu    sync.RWMutex
 	items map[string]Delegate
 	order []string
+
+	// Cached interceptors for fast lookup, built lazily on first access
+	interceptorCache     []Interceptor
+	interceptorCacheDone bool
 }
 
 func typeKey(d Delegate) string {
@@ -125,6 +129,9 @@ func (r *Registry) Register(d Delegate) error {
 	}
 	r.items[key] = d
 	r.order = append(r.order, key)
+	// Invalidate cache when new delegate is registered
+	r.interceptorCacheDone = false
+	r.interceptorCache = nil
 	return nil
 }
 
@@ -135,15 +142,33 @@ func (r *Registry) Get(id string) Delegate {
 }
 
 // Interceptors returns all registered interceptors in registration order.
+// The result is cached for repeated calls.
 func (r *Registry) Interceptors() []Interceptor {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-	var interceptors []Interceptor
+	if r.interceptorCacheDone {
+		result := r.interceptorCache
+		r.mu.RUnlock()
+		return result
+	}
+	r.mu.RUnlock()
+
+	// Build cache under write lock
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if r.interceptorCacheDone {
+		return r.interceptorCache
+	}
+
+	interceptors := make([]Interceptor, 0, len(r.order))
 	for _, key := range r.order {
 		if i, ok := r.items[key].(Interceptor); ok {
 			interceptors = append(interceptors, i)
 		}
 	}
+	r.interceptorCache = interceptors
+	r.interceptorCacheDone = true
 	return interceptors
 }
 

@@ -179,6 +179,45 @@ func BenchmarkInterceptor_PerItem_WithIntercept(b *testing.B) {
 	}
 }
 
+func BenchmarkInterceptor_PerItem_Buffered16(b *testing.B) {
+	data := generateInts(LargeSize)
+	testCtx, registry := core.WithRegistry(ctx)
+	_ = registry.Register(observe.NewCounterInterceptor())
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		stream := flow.FromSlice(data)
+		intercepted := core.InterceptBuffered[int](16).Apply(testCtx, stream)
+		_, _ = core.Slice(testCtx, intercepted)
+	}
+}
+
+func BenchmarkInterceptor_PerItem_Buffered64(b *testing.B) {
+	data := generateInts(LargeSize)
+	testCtx, registry := core.WithRegistry(ctx)
+	_ = registry.Register(observe.NewCounterInterceptor())
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		stream := flow.FromSlice(data)
+		intercepted := core.InterceptBuffered[int](64).Apply(testCtx, stream)
+		_, _ = core.Slice(testCtx, intercepted)
+	}
+}
+
+func BenchmarkInterceptor_PerItem_Buffered256(b *testing.B) {
+	data := generateInts(LargeSize)
+	testCtx, registry := core.WithRegistry(ctx)
+	_ = registry.Register(observe.NewCounterInterceptor())
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		stream := flow.FromSlice(data)
+		intercepted := core.InterceptBuffered[int](256).Apply(testCtx, stream)
+		_, _ = core.Slice(testCtx, intercepted)
+	}
+}
+
 // =============================================================================
 // Event matching overhead
 // Measure the cost of event pattern matching

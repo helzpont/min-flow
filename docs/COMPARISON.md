@@ -4,29 +4,30 @@ This document compares min-flow against popular Go stream processing and resilie
 
 ## Quick Comparison Matrix
 
-| Feature | min-flow | RxGo | go-linq | samber/lo | avast/retry-go | sony/gobreaker |
-|---------|----------|------|---------|-----------|----------------|----------------|
-| **Stars** | — | 5.1k | 3.6k | 19k+ | 2.8k | 3.4k |
-| **Paradigm** | Streams | Observables | LINQ | Utilities | Functions | Functions |
-| **Stream Processing** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Channel-based** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **iter.Seq Support** | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| **Retry** | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ |
-| **Exponential Backoff** | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ |
-| **Circuit Breaker** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Interceptor Pattern** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Event System** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Transformer Fusion** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Zero Dependencies** | ✅ (core) | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Generics** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Parallel Processing** | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| **Observability** | ✅ Built-in | ❌ | ❌ | ❌ | ✅ Callback | ✅ Callback |
+| Feature                 | min-flow    | RxGo        | go-linq | samber/lo | avast/retry-go | sony/gobreaker |
+| ----------------------- | ----------- | ----------- | ------- | --------- | -------------- | -------------- |
+| **Stars**               | —           | 5.1k        | 3.6k    | 19k+      | 2.8k           | 3.4k           |
+| **Paradigm**            | Streams     | Observables | LINQ    | Utilities | Functions      | Functions      |
+| **Stream Processing**   | ✅          | ✅          | ✅      | ❌        | ❌             | ❌             |
+| **Channel-based**       | ✅          | ✅          | ❌      | ❌        | ❌             | ❌             |
+| **iter.Seq Support**    | ✅          | ❌          | ✅      | ❌        | ❌             | ❌             |
+| **Retry**               | ✅          | ✅          | ❌      | ✅        | ✅             | ❌             |
+| **Exponential Backoff** | ✅          | ✅          | ❌      | ✅        | ✅             | ❌             |
+| **Circuit Breaker**     | ✅          | ❌          | ❌      | ❌        | ❌             | ✅             |
+| **Interceptor Pattern** | ✅          | ❌          | ❌      | ❌        | ❌             | ❌             |
+| **Event System**        | ✅          | ❌          | ❌      | ❌        | ❌             | ❌             |
+| **Transformer Fusion**  | ✅          | ❌          | ❌      | ❌        | ❌             | ❌             |
+| **Zero Dependencies**   | ✅ (core)   | ❌          | ❌      | ❌        | ❌             | ❌             |
+| **Generics**            | ✅          | ✅          | ✅      | ✅        | ✅             | ✅             |
+| **Parallel Processing** | ✅          | ✅          | ❌      | ✅        | ❌             | ❌             |
+| **Observability**       | ✅ Built-in | ❌          | ❌      | ❌        | ✅ Callback    | ✅ Callback    |
 
 ## Unique Value Propositions
 
 ### 1. Unified Stream + Resilience + Observability
 
 **The Problem**: Most Go projects cobble together multiple libraries:
+
 - Stream processing: RxGo or go-linq
 - Retry logic: avast/retry-go or cenkalti/backoff
 - Circuit breaker: sony/gobreaker
@@ -77,6 +78,7 @@ stream2 := flow.FromChannel(ch)
 ```
 
 **Event Types**:
+
 - `stream:start`, `stream:end` - Stream lifecycle
 - `item:received`, `item:emitted` - Every item
 - `value:received` - Successful values only
@@ -84,13 +86,14 @@ stream2 := flow.FromChannel(ch)
 - `sentinel:received` - Control signals
 
 **Pattern Matching**:
+
 ```go
 // Match specific events
 interceptor.Events() // ["error:occurred"]
 
 // Match wildcards
 "stream:*"  // All stream events
-"*:start"   // All start events  
+"*:start"   // All start events
 "*"         // All events
 ```
 
@@ -115,6 +118,7 @@ doubled := flow.Map(func(n int) (int, error) {
 ```
 
 **Go 1.23+ iter.Seq Integration**:
+
 ```go
 // Seamlessly work with Go's new iterator protocol
 seq := slices.Values(data)
@@ -167,6 +171,7 @@ result := fused.Apply(ctx, stream)
 ```
 
 **Benchmark Impact** (10,000 items):
+
 - Unfused: ~1.2ms
 - Fused: ~0.4ms (3x faster)
 
@@ -190,14 +195,14 @@ flow/core/        # Zero external dependencies
 
 ### vs. RxGo
 
-| Aspect | RxGo | min-flow |
-|--------|------|----------|
-| **Learning Curve** | Steep (ReactiveX concepts) | Gentle (Go idioms) |
-| **Hot/Cold Observables** | ✅ | Streams are cold by default |
-| **Backpressure** | ✅ Explicit | ✅ Channel-based (natural) |
-| **Error Model** | OnError callback | Result[T] in stream |
-| **Parallel** | Pool-based | Worker-based with ordering options |
-| **Interceptors** | ❌ | ✅ First-class |
+| Aspect                   | RxGo                       | min-flow                           |
+| ------------------------ | -------------------------- | ---------------------------------- |
+| **Learning Curve**       | Steep (ReactiveX concepts) | Gentle (Go idioms)                 |
+| **Hot/Cold Observables** | ✅                         | Streams are cold by default        |
+| **Backpressure**         | ✅ Explicit                | ✅ Channel-based (natural)         |
+| **Error Model**          | OnError callback           | Result[T] in stream                |
+| **Parallel**             | Pool-based                 | Worker-based with ordering options |
+| **Interceptors**         | ❌                         | ✅ First-class                     |
 
 **When to choose RxGo**: You're porting ReactiveX code from another language.
 
@@ -205,13 +210,13 @@ flow/core/        # Zero external dependencies
 
 ### vs. go-linq
 
-| Aspect | go-linq | min-flow |
-|--------|---------|----------|
-| **Focus** | Query syntax | Stream processing |
-| **Concurrency** | ❌ | ✅ Built-in |
-| **Resilience** | ❌ | ✅ Retry, Circuit Breaker |
-| **Lazy Evaluation** | ✅ | ✅ |
-| **iter.Seq** | ✅ | ✅ |
+| Aspect              | go-linq      | min-flow                  |
+| ------------------- | ------------ | ------------------------- |
+| **Focus**           | Query syntax | Stream processing         |
+| **Concurrency**     | ❌           | ✅ Built-in               |
+| **Resilience**      | ❌           | ✅ Retry, Circuit Breaker |
+| **Lazy Evaluation** | ✅           | ✅                        |
+| **iter.Seq**        | ✅           | ✅                        |
 
 **When to choose go-linq**: Simple data queries, no concurrency needed.
 
@@ -219,13 +224,13 @@ flow/core/        # Zero external dependencies
 
 ### vs. samber/lo
 
-| Aspect | samber/lo | min-flow |
-|--------|-----------|----------|
-| **Type** | Utility library | Stream framework |
-| **Lazy** | ❌ Eager | ✅ Lazy |
-| **Memory** | Full collections in memory | Streaming |
-| **Retry** | ✅ Attempt() | ✅ Retry, RetryWithBackoff |
-| **Parallel** | ✅ | ✅ |
+| Aspect       | samber/lo                  | min-flow                   |
+| ------------ | -------------------------- | -------------------------- |
+| **Type**     | Utility library            | Stream framework           |
+| **Lazy**     | ❌ Eager                   | ✅ Lazy                    |
+| **Memory**   | Full collections in memory | Streaming                  |
+| **Retry**    | ✅ Attempt()               | ✅ Retry, RetryWithBackoff |
+| **Parallel** | ✅                         | ✅                         |
 
 **When to choose samber/lo**: Small collections, utility functions.
 
@@ -233,12 +238,12 @@ flow/core/        # Zero external dependencies
 
 ### vs. avast/retry-go + sony/gobreaker
 
-| Aspect | retry-go + gobreaker | min-flow |
-|--------|----------------------|----------|
-| **Integration** | Manual composition | Native |
-| **Scope** | Function wrapping | Stream processing |
-| **Configuration** | Separate configs | Unified delegate configs |
-| **Observability** | Callbacks | Interceptor events |
+| Aspect            | retry-go + gobreaker | min-flow                 |
+| ----------------- | -------------------- | ------------------------ |
+| **Integration**   | Manual composition   | Native                   |
+| **Scope**         | Function wrapping    | Stream processing        |
+| **Configuration** | Separate configs     | Unified delegate configs |
+| **Observability** | Callbacks            | Interceptor events       |
 
 **When to choose separate libraries**: Simple function retry, not streams.
 
@@ -254,6 +259,7 @@ Min-flow prioritizes **correctness and developer experience** over raw performan
 - **Fusion optimization**: Up to 3x speedup for chained mappers
 
 For CPU-bound batch processing where every nanosecond matters, consider:
+
 - Using `Fuse()` for chained transformations
 - Increasing batch sizes in `aggregate.Batch()`
 - Using `parallel.Parallel()` for I/O-bound work
@@ -315,6 +321,7 @@ result := flow.Pipe(
 ## Conclusion
 
 Choose min-flow when you need:
+
 - **Unified solution**: Stream processing + resilience + observability
 - **Go-native patterns**: Channels, context, iter.Seq
 - **Cross-cutting concerns**: Interceptor pattern for metrics/logging/errors
@@ -322,6 +329,7 @@ Choose min-flow when you need:
 - **Minimal dependencies**: Core has zero external dependencies
 
 Choose alternatives when:
+
 - **RxGo**: Porting ReactiveX code, need hot observables
 - **go-linq**: Simple LINQ-style queries, no concurrency
 - **samber/lo**: Utility functions on small collections
