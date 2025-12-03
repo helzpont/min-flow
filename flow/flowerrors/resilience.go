@@ -3,6 +3,7 @@ package flowerrors
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -16,9 +17,57 @@ var ErrMaxRetries = errors.New("max retries exceeded")
 // ErrCircuitOpen is returned when a circuit breaker is in the open state.
 var ErrCircuitOpen = errors.New("circuit breaker is open")
 
+// DefaultMaxRetries is the default number of retries for retry operations.
+const DefaultMaxRetries = 3
+
+// DefaultRetryDelay is the default delay between retries.
+const DefaultRetryDelay = 100 * time.Millisecond
+
+// RetryConfig holds configuration for retry operations.
+// It implements the core.Config interface for context-level configuration.
+type RetryConfig struct {
+	MaxRetries int
+	Backoff    BackoffStrategy
+}
+
+// Init initializes the RetryConfig.
+func (c *RetryConfig) Init() error { return nil }
+
+// Close cleans up the RetryConfig.
+func (c *RetryConfig) Close() error { return nil }
+
+// Validate ensures the RetryConfig has valid values.
+func (c *RetryConfig) Validate() error {
+	if c.MaxRetries < 0 {
+		return fmt.Errorf("max retries must be non-negative, got %d", c.MaxRetries)
+	}
+	return nil
+}
+
+// getRetryConfig returns retry configuration from context or defaults.
+func getRetryConfig(ctx context.Context, maxRetries int) int {
+	if cfg, ok := core.GetConfig[*RetryConfig](ctx); ok {
+		return cfg.MaxRetries
+	}
+	return maxRetries
+}
+
+// getRetryConfigWithBackoff returns retry configuration with backoff from context or defaults.
+func getRetryConfigWithBackoff(ctx context.Context, maxRetries int, backoff BackoffStrategy) (int, BackoffStrategy) {
+	if cfg, ok := core.GetConfig[*RetryConfig](ctx); ok {
+		retries := cfg.MaxRetries
+		if cfg.Backoff != nil {
+			backoff = cfg.Backoff
+		}
+		return retries, backoff
+	}
+	return maxRetries, backoff
+}
+
 // Retry creates a Transformer that retries failed items up to maxRetries times.
 // If an item still fails after all retries, the error is passed through.
 // Only items that result in errors are retried; successful items and sentinels pass through.
+// If a RetryConfig is registered in the context, its MaxRetries overrides the parameter.
 func Retry[T any](maxRetries int, operation func(T) (T, error)) core.Transformer[T, T] {
 	if maxRetries < 0 {
 		maxRetries = 0
@@ -26,6 +75,9 @@ func Retry[T any](maxRetries int, operation func(T) (T, error)) core.Transformer
 
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
+
+		// Check for context-level config
+		effectiveRetries := getRetryConfig(ctx, maxRetries)
 
 		go func() {
 			defer close(out)
@@ -53,7 +105,7 @@ func Retry[T any](maxRetries int, operation func(T) (T, error)) core.Transformer
 				var result T
 				success := false
 
-				for attempt := 0; attempt <= maxRetries; attempt++ {
+				for attempt := 0; attempt <= effectiveRetries; attempt++ {
 					select {
 					case <-ctx.Done():
 						return
@@ -118,6 +170,7 @@ func ExponentialBackoff(initialDelay, maxDelay time.Duration) BackoffStrategy {
 
 // RetryWithBackoff creates a Transformer that retries failed items with configurable backoff.
 // The backoff strategy determines the delay between retries.
+// If a RetryConfig is registered in the context, it overrides the parameters.
 func RetryWithBackoff[T any](maxRetries int, backoff BackoffStrategy, operation func(T) (T, error)) core.Transformer[T, T] {
 	if maxRetries < 0 {
 		maxRetries = 0
@@ -125,6 +178,9 @@ func RetryWithBackoff[T any](maxRetries int, backoff BackoffStrategy, operation 
 
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
+
+		// Check for context-level config
+		effectiveRetries, effectiveBackoff := getRetryConfigWithBackoff(ctx, maxRetries, backoff)
 
 		go func() {
 			defer close(out)
@@ -150,7 +206,7 @@ func RetryWithBackoff[T any](maxRetries int, backoff BackoffStrategy, operation 
 				var result T
 				success := false
 
-				for attempt := 0; attempt <= maxRetries; attempt++ {
+				for attempt := 0; attempt <= effectiveRetries; attempt++ {
 					select {
 					case <-ctx.Done():
 						return
@@ -164,8 +220,8 @@ func RetryWithBackoff[T any](maxRetries int, backoff BackoffStrategy, operation 
 					}
 
 					// Apply backoff delay before next retry (except for last attempt)
-					if attempt < maxRetries {
-						delay := backoff(attempt)
+					if attempt < effectiveRetries {
+						delay := effectiveBackoff(attempt)
 						select {
 						case <-ctx.Done():
 							return

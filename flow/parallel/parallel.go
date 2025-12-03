@@ -2,29 +2,76 @@ package parallel
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
+// ParallelConfig provides configuration for parallel transformers.
+// It can be registered as a delegate to provide default worker counts
+// that can be overridden by function parameters.
+type ParallelConfig struct {
+	// Workers specifies the default number of worker goroutines.
+	// A value of 0 or negative will use the function-level default (1 worker).
+	Workers int
+}
+
+// Init implements the core.Delegate interface.
+func (c *ParallelConfig) Init() error {
+	return nil
+}
+
+// Close implements the core.Delegate interface.
+func (c *ParallelConfig) Close() error {
+	return nil
+}
+
+// Validate implements the core.Config interface.
+// It returns an error if the configuration is invalid.
+func (c *ParallelConfig) Validate() error {
+	if c.Workers < 0 {
+		return fmt.Errorf("parallel config: workers must be >= 0, got %d", c.Workers)
+	}
+	return nil
+}
+
+// WithWorkers returns a functional option that sets the number of workers.
+func WithWorkers(n int) func(*ParallelConfig) {
+	return func(c *ParallelConfig) {
+		c.Workers = n
+	}
+}
+
+// effectiveWorkers returns the number of workers to use, considering
+// context config and the explicitly provided value.
+// If n > 0, it takes precedence. Otherwise, config from context is used.
+// If neither provides a valid value, returns 1.
+func effectiveWorkers(ctx context.Context, n int) int {
+	if n > 0 {
+		return n
+	}
+	if cfg, ok := core.GetConfig[*ParallelConfig](ctx); ok && cfg.Workers > 0 {
+		return cfg.Workers
+	}
+	return 1
+}
+
 // Map creates a Transformer that processes items concurrently using n workers.
 // Each worker applies the given mapper function. Results may arrive out of order.
-// If n <= 0, defaults to 1 worker.
+// If n <= 0, the number of workers is determined from context config or defaults to 1.
 func Map[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
-	if n <= 0 {
-		n = 1
-	}
-
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		workers := effectiveWorkers(ctx, n)
 		out := make(chan core.Result[OUT])
 
 		go func() {
 			defer close(out)
 
 			var wg sync.WaitGroup
-			wg.Add(n)
+			wg.Add(workers)
 
-			for i := 0; i < n; i++ {
+			for i := 0; i < workers; i++ {
 				go func() {
 					defer wg.Done()
 					for res := range in {
@@ -88,22 +135,19 @@ func ParallelMap[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, O
 
 // FlatMap creates a Transformer that applies a flatMapper concurrently using n workers.
 // Each worker can emit zero or more results per input. Results may arrive out of order.
-// If n <= 0, defaults to 1 worker.
+// If n <= 0, the number of workers is determined from context config or defaults to 1.
 func FlatMap[IN, OUT any](n int, flatMapper func(IN) []OUT) core.Transformer[IN, OUT] {
-	if n <= 0 {
-		n = 1
-	}
-
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		workers := effectiveWorkers(ctx, n)
 		out := make(chan core.Result[OUT])
 
 		go func() {
 			defer close(out)
 
 			var wg sync.WaitGroup
-			wg.Add(n)
+			wg.Add(workers)
 
-			for i := 0; i < n; i++ {
+			for i := 0; i < workers; i++ {
 				go func() {
 					defer wg.Done()
 					for res := range in {
@@ -170,13 +214,10 @@ func safeFlatMap[IN, OUT any](flatMapper func(IN) []OUT, value IN) (results []co
 // Ordered creates a Transformer that processes items concurrently but preserves order.
 // Uses a sliding window approach: processes up to n items in parallel while maintaining
 // input order in the output. More expensive than Map but guarantees ordering.
-// If n <= 0, defaults to 1 worker.
+// If n <= 0, the number of workers is determined from context config or defaults to 1.
 func Ordered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
-	if n <= 0 {
-		n = 1
-	}
-
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		workers := effectiveWorkers(ctx, n)
 		out := make(chan core.Result[OUT])
 
 		go func() {
@@ -188,8 +229,8 @@ func Ordered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] 
 			}
 
 			// Semaphore to limit concurrent workers
-			sem := make(chan struct{}, n)
-			resultChan := make(chan indexedResult, n)
+			sem := make(chan struct{}, workers)
+			resultChan := make(chan indexedResult, workers)
 
 			var wg sync.WaitGroup
 			var collectorDone sync.WaitGroup
