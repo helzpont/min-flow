@@ -734,3 +734,420 @@ func TestToFlatMapper(t *testing.T) {
 		}
 	})
 }
+
+func TestMap_PanicRecovery(t *testing.T) {
+	ctx := context.Background()
+
+	panicMapper := Map(func(x int) (int, error) {
+		if x == 2 {
+			panic("intentional panic")
+		}
+		return x * 2, nil
+	})
+
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int], 3)
+		ch <- Ok(1)
+		ch <- Ok(2) // Will panic
+		ch <- Ok(3)
+		close(ch)
+		return ch
+	})
+
+	collected := panicMapper.Apply(ctx, stream).Collect(ctx)
+
+	if len(collected) != 3 {
+		t.Fatalf("got %d results, want 3", len(collected))
+	}
+
+	// First should be value
+	if !collected[0].IsValue() || collected[0].Value() != 2 {
+		t.Errorf("first result should be Ok(2), got %v", collected[0])
+	}
+
+	// Second should be error (from panic)
+	if !collected[1].IsError() {
+		t.Error("second result should be error from panic")
+	}
+
+	// Third should be value
+	if !collected[2].IsValue() || collected[2].Value() != 6 {
+		t.Errorf("third result should be Ok(6), got %v", collected[2])
+	}
+}
+
+func TestFlatMap_PanicRecovery(t *testing.T) {
+	ctx := context.Background()
+
+	panicMapper := FlatMap(func(x int) ([]int, error) {
+		if x == 2 {
+			panic("intentional panic")
+		}
+		return []int{x, x * 10}, nil
+	})
+
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int], 3)
+		ch <- Ok(1)
+		ch <- Ok(2) // Will panic
+		ch <- Ok(3)
+		close(ch)
+		return ch
+	})
+
+	collected := panicMapper.Apply(ctx, stream).Collect(ctx)
+
+	// Should have: [1, 10], [error], [3, 30]
+	var values []int
+	var errors int
+	for _, r := range collected {
+		if r.IsValue() {
+			values = append(values, r.Value())
+		} else if r.IsError() {
+			errors++
+		}
+	}
+
+	if errors != 1 {
+		t.Errorf("got %d errors, want 1", errors)
+	}
+	if len(values) != 4 {
+		t.Errorf("got %d values, want 4 (1, 10, 3, 30)", len(values))
+	}
+}
+
+func TestMapper_ApplyWith_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	slowMapper := Map(func(x int) (int, error) {
+		return x * 2, nil
+	})
+
+	// Create a stream that blocks until we read from it
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int])
+		go func() {
+			defer close(ch)
+			for i := 0; i < 100; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				case ch <- Ok(i):
+				}
+			}
+		}()
+		return ch
+	})
+
+	result := slowMapper.Apply(ctx, stream)
+	resultCh := result.Emit(ctx)
+
+	// Read a few items then cancel
+	count := 0
+	for range resultCh {
+		count++
+		if count >= 3 {
+			cancel()
+			break
+		}
+	}
+
+	// Drain remaining (should be few due to cancellation)
+	for range resultCh {
+		count++
+	}
+
+	if count >= 100 {
+		t.Error("context cancellation should have stopped processing early")
+	}
+}
+
+func TestFlatMapper_ApplyWith_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	flatMapper := FlatMap(func(x int) ([]int, error) {
+		return []int{x, x * 10}, nil
+	})
+
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int])
+		go func() {
+			defer close(ch)
+			for i := 0; i < 100; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				case ch <- Ok(i):
+				}
+			}
+		}()
+		return ch
+	})
+
+	result := flatMapper.Apply(ctx, stream)
+	resultCh := result.Emit(ctx)
+
+	// Read a few items then cancel
+	count := 0
+	for range resultCh {
+		count++
+		if count >= 3 {
+			cancel()
+			break
+		}
+	}
+
+	// Drain remaining
+	for range resultCh {
+		count++
+	}
+
+	// With 100 inputs producing 2 outputs each, max would be 200
+	// Cancellation should stop it well before that
+	if count >= 200 {
+		t.Error("context cancellation should have stopped processing early")
+	}
+}
+
+func TestMapper_ApplyWith_ContextCancelDuringSend(t *testing.T) {
+	// This test covers the ctx.Done case in the select that sends to outChan
+	ctx, cancel := context.WithCancel(context.Background())
+
+	mapper := Map(func(x int) (int, error) {
+		return x * 2, nil
+	})
+
+	// Use unbuffered output to force blocking on send
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int], 10)
+		for i := 0; i < 10; i++ {
+			ch <- Ok(i)
+		}
+		close(ch)
+		return ch
+	})
+
+	result := mapper.ApplyWith(ctx, stream, WithBufferSize(0)) // unbuffered
+	resultCh := result.Emit(ctx)
+
+	// Read one item, then cancel before reading more
+	<-resultCh
+	cancel()
+
+	// The goroutine should detect ctx.Done and return
+	// Give it a moment to clean up
+	count := 1
+	for range resultCh {
+		count++
+	}
+
+	// Should have gotten very few results since we cancelled early
+	if count >= 10 {
+		t.Errorf("expected early termination, got %d results", count)
+	}
+}
+
+func TestFlatMapper_ApplyWith_ContextCancelDuringSend(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	flatMapper := FlatMap(func(x int) ([]int, error) {
+		return []int{x, x + 100}, nil
+	})
+
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int], 10)
+		for i := 0; i < 10; i++ {
+			ch <- Ok(i)
+		}
+		close(ch)
+		return ch
+	})
+
+	result := flatMapper.ApplyWith(ctx, stream, WithBufferSize(0))
+	resultCh := result.Emit(ctx)
+
+	// Read one, then cancel
+	<-resultCh
+	cancel()
+
+	count := 1
+	for range resultCh {
+		count++
+	}
+
+	// Should have gotten few results
+	if count >= 20 {
+		t.Errorf("expected early termination, got %d results", count)
+	}
+}
+
+func TestMapper_ApplyWith_MapperError(t *testing.T) {
+	ctx := context.Background()
+
+	// Mapper that returns an error from the mapper function itself (not result error)
+	// This tests the err != nil path after calling the mapper
+	mapper := Mapper[int, int](func(res Result[int]) (Result[int], error) {
+		if res.Value() == 2 {
+			return Result[int]{}, errors.New("mapper internal error")
+		}
+		return Ok(res.Value() * 2), nil
+	})
+
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int], 3)
+		ch <- Ok(1)
+		ch <- Ok(2)
+		ch <- Ok(3)
+		close(ch)
+		return ch
+	})
+
+	collected := mapper.ApplyWith(ctx, stream)
+	results := collected.Collect(ctx)
+
+	// Should have 3 results: value, error, value
+	if len(results) != 3 {
+		t.Fatalf("got %d results, want 3", len(results))
+	}
+
+	if !results[0].IsValue() {
+		t.Error("first should be value")
+	}
+	if !results[1].IsError() {
+		t.Error("second should be error")
+	}
+	if !results[2].IsValue() {
+		t.Error("third should be value")
+	}
+}
+
+func TestFlatMapper_ApplyWith_MapperError(t *testing.T) {
+	ctx := context.Background()
+
+	// FlatMapper that returns an error from the mapper function itself
+	mapper := FlatMapper[int, int](func(res Result[int]) ([]Result[int], error) {
+		if res.Value() == 2 {
+			return nil, errors.New("flatmapper internal error")
+		}
+		return []Result[int]{Ok(res.Value() * 2)}, nil
+	})
+
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int], 3)
+		ch <- Ok(1)
+		ch <- Ok(2)
+		ch <- Ok(3)
+		close(ch)
+		return ch
+	})
+
+	collected := mapper.ApplyWith(ctx, stream)
+	results := collected.Collect(ctx)
+
+	if len(results) != 3 {
+		t.Fatalf("got %d results, want 3", len(results))
+	}
+
+	if !results[0].IsValue() {
+		t.Error("first should be value")
+	}
+	if !results[1].IsError() {
+		t.Error("second should be error")
+	}
+	if !results[2].IsValue() {
+		t.Error("third should be value")
+	}
+}
+
+func TestFuse_FirstMapperError(t *testing.T) {
+	// First mapper returns error - it should be wrapped in the result
+	first := Mapper[int, int](func(res Result[int]) (Result[int], error) {
+		return Result[int]{}, errors.New("first mapper error")
+	})
+	second := Map(func(x int) (int, error) { return x * 2, nil })
+
+	fused := Fuse(first, second)
+
+	result, err := fused(Ok(1))
+	// Fuse wraps mapper errors in Result, doesn't return them
+	if err != nil {
+		t.Errorf("Fuse should not return error, got %v", err)
+	}
+	if !result.IsError() {
+		t.Error("Fuse should return error Result when first mapper errors")
+	}
+}
+
+func TestFuseFlat_FirstMapperError(t *testing.T) {
+	// First flatmapper returns error - it should be wrapped
+	first := FlatMapper[int, int](func(res Result[int]) ([]Result[int], error) {
+		return nil, errors.New("first flatmapper error")
+	})
+	second := FlatMap(func(x int) ([]int, error) { return []int{x * 2}, nil })
+
+	fused := FuseFlat(first, second)
+
+	results, err := fused(Ok(1))
+	// FuseFlat wraps errors in Result
+	if err != nil {
+		t.Errorf("FuseFlat should not return error, got %v", err)
+	}
+	if len(results) != 1 || !results[0].IsError() {
+		t.Error("FuseFlat should return error Result when first flatmapper errors")
+	}
+}
+
+func TestFuseFlat_SecondMapperError(t *testing.T) {
+	first := FlatMap(func(x int) ([]int, error) { return []int{x, x + 1}, nil })
+	// Second flatmapper returns error for specific values
+	second := FlatMapper[int, int](func(res Result[int]) ([]Result[int], error) {
+		if res.Value() == 2 {
+			return nil, errors.New("second flatmapper error")
+		}
+		return []Result[int]{Ok(res.Value() * 10)}, nil
+	})
+
+	fused := FuseFlat(first, second)
+
+	// Input 1 -> first produces [1, 2] -> second: 1->10, 2->error
+	results, err := fused(Ok(1))
+	if err != nil {
+		t.Errorf("FuseFlat should not return error, got %v", err)
+	}
+
+	// Should have Ok(10) and Err for value 2
+	var values []int
+	var errors int
+	for _, r := range results {
+		if r.IsValue() {
+			values = append(values, r.Value())
+		} else if r.IsError() {
+			errors++
+		}
+	}
+
+	if len(values) != 1 || values[0] != 10 {
+		t.Errorf("got values %v, want [10]", values)
+	}
+	if errors != 1 {
+		t.Errorf("got %d errors, want 1", errors)
+	}
+}
+
+func TestToFlatMapper_MapperError(t *testing.T) {
+	// Mapper that returns an error - it should be wrapped
+	mapper := Mapper[int, int](func(res Result[int]) (Result[int], error) {
+		return Result[int]{}, errors.New("mapper error")
+	})
+
+	flat := mapper.ToFlatMapper()
+	results, err := flat(Ok(1))
+
+	// ToFlatMapper wraps errors in Result
+	if err != nil {
+		t.Errorf("ToFlatMapper should not return error, got %v", err)
+	}
+	if len(results) != 1 || !results[0].IsError() {
+		t.Error("ToFlatMapper should return error Result when mapper errors")
+	}
+}
