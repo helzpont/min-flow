@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"iter"
 	"strconv"
 	"testing"
 )
@@ -1153,5 +1154,321 @@ func TestToFlatMapper_MapperError(t *testing.T) {
 	}
 	if len(results) != 1 || !results[0].IsError() {
 		t.Error("ToFlatMapper should return error Result when mapper errors")
+	}
+}
+
+// =============================================================================
+// IterFlatMapper Tests
+// =============================================================================
+
+func TestIterFlatMap(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		input      []int
+		flatMapFn  func(int) iter.Seq[int]
+		wantValues []int
+	}{
+		{
+			name:  "duplicate each",
+			input: []int{1, 2, 3},
+			flatMapFn: func(x int) iter.Seq[int] {
+				return func(yield func(int) bool) {
+					yield(x)
+					yield(x)
+				}
+			},
+			wantValues: []int{1, 1, 2, 2, 3, 3},
+		},
+		{
+			name:  "triple each",
+			input: []int{1, 2},
+			flatMapFn: func(x int) iter.Seq[int] {
+				return func(yield func(int) bool) {
+					for i := 0; i < 3; i++ {
+						if !yield(x * (i + 1)) {
+							return
+						}
+					}
+				}
+			},
+			wantValues: []int{1, 2, 3, 2, 4, 6},
+		},
+		{
+			name:  "filter odd (return nothing)",
+			input: []int{1, 2, 3, 4},
+			flatMapFn: func(x int) iter.Seq[int] {
+				return func(yield func(int) bool) {
+					if x%2 == 0 {
+						yield(x)
+					}
+				}
+			},
+			wantValues: []int{2, 4},
+		},
+		{
+			name:       "empty input",
+			input:      []int{},
+			flatMapFn:  func(x int) iter.Seq[int] { return func(yield func(int) bool) { yield(x) } },
+			wantValues: []int{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ifm := IterFlatMap(tt.flatMapFn)
+			stream := streamFromSlice(tt.input)
+			result := ifm.Apply(ctx, stream)
+			collected := result.Collect(ctx)
+
+			if len(collected) != len(tt.wantValues) {
+				t.Fatalf("got %d results, want %d", len(collected), len(tt.wantValues))
+			}
+
+			for i, res := range collected {
+				if res.IsError() {
+					t.Errorf("result[%d] is error: %v", i, res.Error())
+					continue
+				}
+				if res.Value() != tt.wantValues[i] {
+					t.Errorf("result[%d] = %d, want %d", i, res.Value(), tt.wantValues[i])
+				}
+			}
+		})
+	}
+}
+
+func TestIterFlatMapSlice(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		input      []int
+		flatMapFn  func(int) ([]int, error)
+		wantValues []int
+		wantErrors int
+	}{
+		{
+			name:  "duplicate each",
+			input: []int{1, 2, 3},
+			flatMapFn: func(x int) ([]int, error) {
+				return []int{x, x}, nil
+			},
+			wantValues: []int{1, 1, 2, 2, 3, 3},
+		},
+		{
+			name:  "with error",
+			input: []int{1, 2, 3},
+			flatMapFn: func(x int) ([]int, error) {
+				if x == 2 {
+					return nil, errors.New("skip 2")
+				}
+				return []int{x}, nil
+			},
+			wantValues: []int{1, 3},
+			wantErrors: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ifm := IterFlatMapSlice(tt.flatMapFn)
+			stream := streamFromSlice(tt.input)
+			result := ifm.Apply(ctx, stream)
+			collected := result.Collect(ctx)
+
+			var values []int
+			var errCount int
+			for _, res := range collected {
+				if res.IsError() {
+					errCount++
+				} else {
+					values = append(values, res.Value())
+				}
+			}
+
+			if len(values) != len(tt.wantValues) {
+				t.Fatalf("got %d values, want %d", len(values), len(tt.wantValues))
+			}
+			for i, v := range values {
+				if v != tt.wantValues[i] {
+					t.Errorf("values[%d] = %d, want %d", i, v, tt.wantValues[i])
+				}
+			}
+			if errCount != tt.wantErrors {
+				t.Errorf("got %d errors, want %d", errCount, tt.wantErrors)
+			}
+		})
+	}
+}
+
+func TestIterFlatMapper_PanicRecovery(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("IterFlatMap panic", func(t *testing.T) {
+		ifm := IterFlatMap(func(x int) iter.Seq[int] {
+			return func(yield func(int) bool) {
+				if x == 2 {
+					panic("boom")
+				}
+				yield(x)
+			}
+		})
+
+		stream := streamFromSlice([]int{1, 2, 3})
+		result := ifm.Apply(ctx, stream)
+		collected := result.Collect(ctx)
+
+		var values []int
+		var errCount int
+		for _, res := range collected {
+			if res.IsError() {
+				errCount++
+				var pe ErrPanic
+				if !errors.As(res.Error(), &pe) {
+					t.Error("expected ErrPanic")
+				}
+			} else {
+				values = append(values, res.Value())
+			}
+		}
+
+		if len(values) != 2 || values[0] != 1 || values[1] != 3 {
+			t.Errorf("got values %v, want [1, 3]", values)
+		}
+		if errCount != 1 {
+			t.Errorf("got %d errors, want 1", errCount)
+		}
+	})
+
+	t.Run("IterFlatMapSlice panic", func(t *testing.T) {
+		ifm := IterFlatMapSlice(func(x int) ([]int, error) {
+			if x == 2 {
+				panic("boom")
+			}
+			return []int{x}, nil
+		})
+
+		stream := streamFromSlice([]int{1, 2, 3})
+		result := ifm.Apply(ctx, stream)
+		collected := result.Collect(ctx)
+
+		var values []int
+		var errCount int
+		for _, res := range collected {
+			if res.IsError() {
+				errCount++
+			} else {
+				values = append(values, res.Value())
+			}
+		}
+
+		if len(values) != 2 {
+			t.Errorf("got %d values, want 2", len(values))
+		}
+		if errCount != 1 {
+			t.Errorf("got %d errors, want 1", errCount)
+		}
+	})
+}
+
+func TestIterFlatMapper_ErrorPropagation(t *testing.T) {
+	ctx := context.Background()
+
+	ifm := IterFlatMap(func(x int) iter.Seq[int] {
+		return func(yield func(int) bool) {
+			yield(x * 2)
+		}
+	})
+
+	// Create stream with an error in the middle
+	stream := Emit(func(ctx context.Context) <-chan Result[int] {
+		ch := make(chan Result[int], 3)
+		ch <- Ok(1)
+		ch <- Err[int](errors.New("test error"))
+		ch <- Ok(3)
+		close(ch)
+		return ch
+	})
+
+	result := ifm.Apply(ctx, stream)
+	collected := result.Collect(ctx)
+
+	if len(collected) != 3 {
+		t.Fatalf("got %d results, want 3", len(collected))
+	}
+
+	// First result: 1 * 2 = 2
+	if collected[0].IsError() || collected[0].Value() != 2 {
+		t.Errorf("result[0] = %v, want Ok(2)", collected[0])
+	}
+
+	// Second result: error propagated
+	if !collected[1].IsError() {
+		t.Error("result[1] should be error")
+	}
+
+	// Third result: 3 * 2 = 6
+	if collected[2].IsError() || collected[2].Value() != 6 {
+		t.Errorf("result[2] = %v, want Ok(6)", collected[2])
+	}
+}
+
+func TestIterFlatMapper_ApplyWith(t *testing.T) {
+	ctx := context.Background()
+	duplicate := IterFlatMap(func(x int) iter.Seq[int] {
+		return func(yield func(int) bool) {
+			yield(x)
+			yield(x)
+		}
+	})
+
+	tests := []struct {
+		name       string
+		input      []int
+		opts       []TransformOption
+		wantValues []int
+	}{
+		{
+			name:       "default buffer",
+			input:      []int{1, 2},
+			opts:       nil,
+			wantValues: []int{1, 1, 2, 2},
+		},
+		{
+			name:       "high throughput",
+			input:      []int{1, 2, 3},
+			opts:       []TransformOption{WithHighThroughput()},
+			wantValues: []int{1, 1, 2, 2, 3, 3},
+		},
+		{
+			name:       "unbuffered",
+			input:      []int{5},
+			opts:       []TransformOption{WithBufferSize(0)},
+			wantValues: []int{5, 5},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stream := streamFromSlice(tt.input)
+			result := duplicate.ApplyWith(ctx, stream, tt.opts...)
+			collected := result.Collect(ctx)
+
+			if len(collected) != len(tt.wantValues) {
+				t.Fatalf("got %d results, want %d", len(collected), len(tt.wantValues))
+			}
+
+			for i, res := range collected {
+				if res.IsError() {
+					t.Errorf("result[%d] is error: %v", i, res.Error())
+					continue
+				}
+				if res.Value() != tt.wantValues[i] {
+					t.Errorf("result[%d] = %d, want %d", i, res.Value(), tt.wantValues[i])
+				}
+			}
+		})
 	}
 }

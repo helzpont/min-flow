@@ -13,6 +13,7 @@
 ### Hypothesis
 
 FlatMapper allocates a `[]Result[OUT]` slice for every input item:
+
 ```go
 results := make([]Result[OUT], len(mappedValues))
 ```
@@ -22,6 +23,7 @@ sync.Pool could potentially reduce GC pressure by reusing these slices.
 ### Benchmark Results
 
 #### Micro-benchmark: Slice Allocation Only
+
 ```
 BenchmarkSliceAllocation/make_each_time-14      70422018    14.31 ns/op    80 B/op    1 allocs/op
 BenchmarkSliceAllocation/sync_pool-14           51535506    22.81 ns/op     0 B/op    0 allocs/op
@@ -31,6 +33,7 @@ BenchmarkSliceAllocation/reuse_single_slice-14 445413631     2.69 ns/op     0 B/
 For simple int slices, sync.Pool is actually **slower** than make() due to pool overhead.
 
 #### Micro-benchmark: Result[int] Slices
+
 ```
 BenchmarkResultSliceAllocation/make_Result_slice-14    31627893    37.37 ns/op   320 B/op   1 allocs/op
 BenchmarkResultSliceAllocation/pool_Result_slice-14    69997885    16.94 ns/op     0 B/op   0 allocs/op
@@ -39,6 +42,7 @@ BenchmarkResultSliceAllocation/pool_Result_slice-14    69997885    16.94 ns/op  
 For larger Result slices, sync.Pool is 2.2x faster in isolation.
 
 #### Realistic FlatMap with Channels
+
 ```
 BenchmarkRealisticFlatMap/current_approach-14       8888   137.1 µs   2465 B/op   3 allocs/op
 BenchmarkRealisticFlatMap/pooled_approach-14        8234   153.4 µs   2467 B/op   3 allocs/op
@@ -47,6 +51,7 @@ BenchmarkRealisticFlatMap/iterator_approach-14      9088   132.1 µs   2464 B/op
 ```
 
 In a realistic scenario with channels:
+
 - **Pooled: 12% SLOWER than current**
 - Direct send (no slice): 5% faster
 - Iterator (iter.Seq): 4% faster
@@ -63,35 +68,28 @@ In a realistic scenario with channels:
 
 ### Alternative Optimizations Found
 
-The benchmarks revealed that **avoiding the intermediate slice** is the real opportunity:
+The micro-benchmarks suggested that avoiding the intermediate slice might help:
 
-| Approach | Time | vs Current |
-|----------|------|------------|
-| Current (slice) | 137.1 µs | baseline |
+| Approach               | Time     | vs Current     |
+| ---------------------- | -------- | -------------- |
+| Current (slice)        | 137.1 µs | baseline       |
 | No slice (direct send) | 130.5 µs | **+5% faster** |
-| Iterator (iter.Seq) | 132.1 µs | **+4% faster** |
+| Iterator (iter.Seq)    | 132.1 µs | **+4% faster** |
 
-This suggests a potential API enhancement:
-
-```go
-// Current FlatMapper returns a slice
-type FlatMapper[IN, OUT any] func(Result[IN]) ([]Result[OUT], error)
-
-// Alternative: Iterator-based FlatMapper (future consideration)
-type IterFlatMapper[IN, OUT any] func(Result[IN]) iter.Seq[Result[OUT]]
-```
+However, **this was misleading** - see [ITER_FLATMAPPER.md](./ITER_FLATMAPPER.md) for the full investigation. When tested in realistic scenarios with proper `Result[T]` types and the full FlatMapper implementation, the iterator approach is actually **10-15% slower** due to closure allocation overhead.
 
 ## Recommendations
 
 1. **Do NOT use sync.Pool for FlatMapper slices** - it makes things worse.
 
-2. **Consider iterator-based FlatMapper** as a future enhancement for the fast package - potential 4-5% improvement.
+2. **Do NOT use iterator-based FlatMapper for performance** - see ITER_FLATMAPPER.md for details.
 
-3. **Focus optimization efforts elsewhere** - the current slice allocation approach is efficient enough.
+3. **The current slice-based approach is optimal** - Go's allocator is highly efficient for our use case.
 
 ## Conclusion
 
 sync.Pool is designed for scenarios with:
+
 - Long-lived allocations
 - Concurrent access patterns
 - Large allocation sizes

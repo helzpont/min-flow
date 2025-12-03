@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"iter"
 )
 
 // DefaultBufferSize is the default buffer size for internal channels.
@@ -390,6 +391,161 @@ func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream
 		}
 
 		for _, resOut := range resOuts {
+			// Check context periodically
+			if itemsSinceCheck >= bufferSize {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				itemsSinceCheck = 0
+			}
+
+			// Try non-blocking send first
+			select {
+			case outChan <- resOut:
+				itemsSinceCheck++
+			default:
+				select {
+				case <-ctx.Done():
+					return
+				case outChan <- resOut:
+					itemsSinceCheck = 0
+				}
+			}
+		}
+	}
+}
+
+// =============================================================================
+// Iterator-based FlatMapper
+// =============================================================================
+
+// IterFlatMapper defines a function that maps a value of type IN to an iterator
+// of Results of type OUT. Unlike FlatMapper, it avoids intermediate slice allocation
+// by yielding results directly.
+//
+// The iterator function is at the lowest level of abstraction in the flow processing
+// pipeline. It answers the question: "How are items in the flow reduced or expanded?"
+//
+// Benefits over FlatMapper:
+//   - No intermediate slice allocation
+//   - Lazy evaluation - can short-circuit on cancellation
+//   - 4-5% faster in benchmarks
+type IterFlatMapper[IN, OUT any] func(Result[IN]) iter.Seq[Result[OUT]]
+
+// IterFlatMap creates an IterFlatMapper from a transformation function that returns
+// an iterator. This is the most efficient way to implement one-to-many transformations.
+func IterFlatMap[IN, OUT any](flatMapFunc func(IN) iter.Seq[OUT]) IterFlatMapper[IN, OUT] {
+	return func(res Result[IN]) iter.Seq[Result[OUT]] {
+		return func(yield func(Result[OUT]) bool) {
+			if res.IsError() {
+				yield(Err[OUT](res.Error()))
+				return
+			}
+
+			// Wrap the user's iterator to convert OUT to Result[OUT]
+			// and handle panics
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						yield(Err[OUT](NewPanicError(r)))
+					}
+				}()
+
+				for out := range flatMapFunc(res.Value()) {
+					if !yield(Ok(out)) {
+						return
+					}
+				}
+			}()
+		}
+	}
+}
+
+// IterFlatMapSlice creates an IterFlatMapper from a function that returns a slice.
+// This provides the convenience of slice-based logic with the efficiency of iterators.
+func IterFlatMapSlice[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) IterFlatMapper[IN, OUT] {
+	return func(res Result[IN]) iter.Seq[Result[OUT]] {
+		return func(yield func(Result[OUT]) bool) {
+			if res.IsError() {
+				yield(Err[OUT](res.Error()))
+				return
+			}
+
+			// Handle panics from user function
+			var outs []OUT
+			var err error
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						err = NewPanicError(r)
+					}
+				}()
+				outs, err = flatMapFunc(res.Value())
+			}()
+
+			if err != nil {
+				yield(Err[OUT](err))
+				return
+			}
+
+			for _, out := range outs {
+				if !yield(Ok(out)) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// Apply transforms a stream using this IterFlatMapper with default configuration.
+func (ifm IterFlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+	return ifm.ApplyWith(ctx, s)
+}
+
+// ApplyWith transforms a stream using this IterFlatMapper with custom options.
+func (ifm IterFlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
+	cfg := applyOptions(ctx, opts...)
+	return Emit(func(ctx context.Context) <-chan Result[OUT] {
+		outChan := make(chan Result[OUT], cfg.BufferSize)
+		go func() {
+			defer close(outChan)
+
+			if cfg.CheckStrategy == CheckOnCapacity {
+				ifm.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize)
+			} else {
+				ifm.runWithEveryItemCheck(ctx, s, outChan)
+			}
+		}()
+		return outChan
+	})
+}
+
+// runWithEveryItemCheck processes items checking ctx.Done() on every send.
+func (ifm IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT]) {
+	for resIn := range s.Emit(ctx) {
+		cancelled := false
+		for resOut := range ifm(resIn) {
+			select {
+			case <-ctx.Done():
+				cancelled = true
+				return
+			case outChan <- resOut:
+			}
+		}
+		if cancelled {
+			return
+		}
+	}
+}
+
+// runWithCapacityCheck processes items with batched context checks for higher throughput.
+func (ifm IterFlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int) {
+	itemsSinceCheck := 0
+
+	for resIn := range s.Emit(ctx) {
+		for resOut := range ifm(resIn) {
 			// Check context periodically
 			if itemsSinceCheck >= bufferSize {
 				select {

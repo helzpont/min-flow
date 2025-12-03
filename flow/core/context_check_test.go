@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"iter"
 	"testing"
 	"time"
 )
@@ -344,4 +345,160 @@ func TestFlatMapperWithCheckOnCapacity(t *testing.T) {
 			t.Errorf("results[%d] = %d, expected %d", i, v, expected[i])
 		}
 	}
+}
+
+// =============================================================================
+// FlatMapper vs IterFlatMapper Benchmarks
+// =============================================================================
+
+// BenchmarkFlatMapperVsIterFlatMapper compares slice-based vs iterator-based FlatMapper
+func BenchmarkFlatMapperVsIterFlatMapper(b *testing.B) {
+	const itemCount = 10000
+	const outputsPerItem = 5
+
+	data := make([]int, itemCount)
+	for i := range data {
+		data[i] = i
+	}
+
+	makeStream := func() Stream[int] {
+		return Emit(func(ctx context.Context) <-chan Result[int] {
+			ch := make(chan Result[int], 64)
+			go func() {
+				defer close(ch)
+				for _, v := range data {
+					ch <- Ok(v)
+				}
+			}()
+			return ch
+		})
+	}
+
+	b.Run("FlatMapper_slice", func(b *testing.B) {
+		fm := FlatMap(func(x int) ([]int, error) {
+			out := make([]int, outputsPerItem)
+			for i := range out {
+				out[i] = x * (i + 1)
+			}
+			return out, nil
+		})
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ctx := context.Background()
+			stream := makeStream()
+			mapped := fm.Apply(ctx, stream)
+			_, _ = Slice(ctx, mapped)
+		}
+	})
+
+	b.Run("IterFlatMapper_iter", func(b *testing.B) {
+		ifm := IterFlatMap(func(x int) iter.Seq[int] {
+			return func(yield func(int) bool) {
+				for i := 0; i < outputsPerItem; i++ {
+					if !yield(x * (i + 1)) {
+						return
+					}
+				}
+			}
+		})
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ctx := context.Background()
+			stream := makeStream()
+			mapped := ifm.Apply(ctx, stream)
+			_, _ = Slice(ctx, mapped)
+		}
+	})
+
+	b.Run("IterFlatMapSlice_iter", func(b *testing.B) {
+		ifm := IterFlatMapSlice(func(x int) ([]int, error) {
+			out := make([]int, outputsPerItem)
+			for i := range out {
+				out[i] = x * (i + 1)
+			}
+			return out, nil
+		})
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ctx := context.Background()
+			stream := makeStream()
+			mapped := ifm.Apply(ctx, stream)
+			_, _ = Slice(ctx, mapped)
+		}
+	})
+}
+
+// BenchmarkFlatMapperVsIterFlatMapper_WithStrategies tests both types with different check strategies
+func BenchmarkFlatMapperVsIterFlatMapper_WithStrategies(b *testing.B) {
+	const itemCount = 10000
+	const outputsPerItem = 3
+
+	data := make([]int, itemCount)
+	for i := range data {
+		data[i] = i
+	}
+
+	makeStream := func() Stream[int] {
+		return Emit(func(ctx context.Context) <-chan Result[int] {
+			ch := make(chan Result[int], 64)
+			go func() {
+				defer close(ch)
+				for _, v := range data {
+					ch <- Ok(v)
+				}
+			}()
+			return ch
+		})
+	}
+
+	fm := FlatMap(func(x int) ([]int, error) {
+		return []int{x, x * 2, x * 3}, nil
+	})
+
+	ifm := IterFlatMap(func(x int) iter.Seq[int] {
+		return func(yield func(int) bool) {
+			yield(x)
+			yield(x * 2)
+			yield(x * 3)
+		}
+	})
+
+	b.Run("FlatMapper_CheckEveryItem", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			ctx := context.Background()
+			mapped := fm.ApplyWith(ctx, makeStream(), WithFastCancellation())
+			_, _ = Slice(ctx, mapped)
+		}
+	})
+
+	b.Run("FlatMapper_CheckOnCapacity", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			ctx := context.Background()
+			mapped := fm.ApplyWith(ctx, makeStream(), WithHighThroughput())
+			_, _ = Slice(ctx, mapped)
+		}
+	})
+
+	b.Run("IterFlatMapper_CheckEveryItem", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			ctx := context.Background()
+			mapped := ifm.ApplyWith(ctx, makeStream(), WithFastCancellation())
+			_, _ = Slice(ctx, mapped)
+		}
+	})
+
+	b.Run("IterFlatMapper_CheckOnCapacity", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			ctx := context.Background()
+			mapped := ifm.ApplyWith(ctx, makeStream(), WithHighThroughput())
+			_, _ = Slice(ctx, mapped)
+		}
+	})
 }
