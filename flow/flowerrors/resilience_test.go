@@ -339,8 +339,8 @@ func TestFallback(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("fallback on error", func(t *testing.T) {
-		emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-			out := make(chan *core.Result[int])
+		emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+			out := make(chan core.Result[int])
 			go func() {
 				defer close(out)
 				out <- core.Ok(1)
@@ -376,8 +376,8 @@ func TestFallback(t *testing.T) {
 	})
 
 	t.Run("fallback value", func(t *testing.T) {
-		emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-			out := make(chan *core.Result[int])
+		emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+			out := make(chan core.Result[int])
 			go func() {
 				defer close(out)
 				out <- core.Err[int](errors.New("error"))
@@ -414,8 +414,8 @@ func TestRecover(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("recover from error", func(t *testing.T) {
-		emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-			out := make(chan *core.Result[int])
+		emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+			out := make(chan core.Result[int])
 			go func() {
 				defer close(out)
 				out <- core.Ok(1)
@@ -448,8 +448,8 @@ func TestRecover(t *testing.T) {
 	})
 
 	t.Run("recovery fails", func(t *testing.T) {
-		emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-			out := make(chan *core.Result[int])
+		emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+			out := make(chan core.Result[int])
 			go func() {
 				defer close(out)
 				out <- core.Err[int](errors.New("original"))
@@ -483,8 +483,8 @@ func TestRecover(t *testing.T) {
 func TestRecoverPanic(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)

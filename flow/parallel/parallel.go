@@ -15,8 +15,8 @@ func Map[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
 		n = 1
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[IN]) <-chan *core.Result[OUT] {
-		out := make(chan *core.Result[OUT])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		out := make(chan core.Result[OUT])
 
 		go func() {
 			defer close(out)
@@ -71,7 +71,7 @@ func Map[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] {
 }
 
 // safeMap applies a mapper function with panic recovery.
-func safeMap[IN, OUT any](mapper func(IN) OUT, value IN) (result *core.Result[OUT]) {
+func safeMap[IN, OUT any](mapper func(IN) OUT, value IN) (result core.Result[OUT]) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch e := r.(type) {
@@ -99,8 +99,8 @@ func FlatMap[IN, OUT any](n int, flatMapper func(IN) []OUT) core.Transformer[IN,
 		n = 1
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[IN]) <-chan *core.Result[OUT] {
-		out := make(chan *core.Result[OUT])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		out := make(chan core.Result[OUT])
 
 		go func() {
 			defer close(out)
@@ -157,20 +157,20 @@ func FlatMap[IN, OUT any](n int, flatMapper func(IN) []OUT) core.Transformer[IN,
 }
 
 // safeFlatMap applies a flatMapper function with panic recovery.
-func safeFlatMap[IN, OUT any](flatMapper func(IN) []OUT, value IN) (results []*core.Result[OUT]) {
+func safeFlatMap[IN, OUT any](flatMapper func(IN) []OUT, value IN) (results []core.Result[OUT]) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch e := r.(type) {
 			case error:
-				results = []*core.Result[OUT]{core.Err[OUT](e)}
+				results = []core.Result[OUT]{core.Err[OUT](e)}
 			default:
-				results = []*core.Result[OUT]{core.Err[OUT](core.ErrPanic{Value: e})}
+				results = []core.Result[OUT]{core.Err[OUT](core.ErrPanic{Value: e})}
 			}
 		}
 	}()
 
 	values := flatMapper(value)
-	results = make([]*core.Result[OUT], len(values))
+	results = make([]core.Result[OUT], len(values))
 	for i, v := range values {
 		results[i] = core.Ok(v)
 	}
@@ -186,15 +186,15 @@ func Ordered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] 
 		n = 1
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[IN]) <-chan *core.Result[OUT] {
-		out := make(chan *core.Result[OUT])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		out := make(chan core.Result[OUT])
 
 		go func() {
 			defer close(out)
 
 			type indexedResult struct {
 				index  int
-				result *core.Result[OUT]
+				result core.Result[OUT]
 			}
 
 			// Semaphore to limit concurrent workers
@@ -208,7 +208,7 @@ func Ordered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] 
 			// Collector goroutine - maintains order
 			go func() {
 				defer collectorDone.Done()
-				results := make(map[int]*core.Result[OUT])
+				results := make(map[int]core.Result[OUT])
 				nextIndex := 0
 
 				for ir := range resultChan {
@@ -256,13 +256,13 @@ func Ordered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] 
 				}
 
 				wg.Add(1)
-				go func(idx int, r *core.Result[IN]) {
+				go func(idx int, r core.Result[IN]) {
 					defer func() {
 						<-sem
 						wg.Done()
 					}()
 
-					var result *core.Result[OUT]
+					var result core.Result[OUT]
 					if r.IsError() {
 						result = core.Err[OUT](r.Error())
 					} else if r.IsSentinel() {
@@ -292,8 +292,8 @@ func Ordered[IN, OUT any](n int, mapper func(IN) OUT) core.Transformer[IN, OUT] 
 // The mapper function itself handles its own concurrency (e.g., making HTTP requests).
 // Results are emitted as they complete (out of order).
 func AsyncMap[IN, OUT any](mapper func(context.Context, IN) (OUT, error)) core.Transformer[IN, OUT] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[IN]) <-chan *core.Result[OUT] {
-		out := make(chan *core.Result[OUT])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		out := make(chan core.Result[OUT])
 
 		go func() {
 			defer close(out)
@@ -324,7 +324,7 @@ func AsyncMap[IN, OUT any](mapper func(context.Context, IN) (OUT, error)) core.T
 					defer wg.Done()
 
 					result, err := mapper(ctx, value)
-					var r *core.Result[OUT]
+					var r core.Result[OUT]
 					if err != nil {
 						r = core.Err[OUT](err)
 					} else {
@@ -347,15 +347,15 @@ func AsyncMap[IN, OUT any](mapper func(context.Context, IN) (OUT, error)) core.T
 
 // AsyncMapOrdered is like AsyncMap but preserves input order in output.
 func AsyncMapOrdered[IN, OUT any](mapper func(context.Context, IN) (OUT, error)) core.Transformer[IN, OUT] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[IN]) <-chan *core.Result[OUT] {
-		out := make(chan *core.Result[OUT])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		out := make(chan core.Result[OUT])
 
 		go func() {
 			defer close(out)
 
 			type indexedResult struct {
 				index  int
-				result *core.Result[OUT]
+				result core.Result[OUT]
 			}
 
 			resultChan := make(chan indexedResult)
@@ -366,7 +366,7 @@ func AsyncMapOrdered[IN, OUT any](mapper func(context.Context, IN) (OUT, error))
 			// Collector goroutine
 			go func() {
 				defer collectorDone.Done()
-				results := make(map[int]*core.Result[OUT])
+				results := make(map[int]core.Result[OUT])
 				nextIndex := 0
 
 				for ir := range resultChan {
@@ -435,7 +435,7 @@ func AsyncMapOrdered[IN, OUT any](mapper func(context.Context, IN) (OUT, error))
 					defer wg.Done()
 
 					result, err := mapper(ctx, value)
-					var r *core.Result[OUT]
+					var r core.Result[OUT]
 					if err != nil {
 						r = core.Err[OUT](err)
 					} else {

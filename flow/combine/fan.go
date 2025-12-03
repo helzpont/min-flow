@@ -9,7 +9,7 @@ import (
 )
 
 // safeMap wraps a mapper function with panic recovery
-func safeMap[IN, OUT any](mapper func(IN) OUT, value IN) (result *core.Result[OUT]) {
+func safeMap[IN, OUT any](mapper func(IN) OUT, value IN) (result core.Result[OUT]) {
 	defer func() {
 		if r := recover(); r != nil {
 			result = core.Err[OUT](fmt.Errorf("panic in mapper: %v", r))
@@ -28,12 +28,12 @@ func FanOut[T any](n int, stream core.Stream[T]) []core.Stream[T] {
 	}
 
 	outputs := make([]core.Stream[T], n)
-	channels := make([]chan *core.Result[T], n)
+	channels := make([]chan core.Result[T], n)
 
 	for i := 0; i < n; i++ {
-		ch := make(chan *core.Result[T], 16) // Buffer to reduce blocking
+		ch := make(chan core.Result[T], 16) // Buffer to reduce blocking
 		channels[i] = ch
-		outputs[i] = core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
+		outputs[i] = core.Emit(func(ctx context.Context) <-chan core.Result[T] {
 			return ch
 		})
 	}
@@ -65,12 +65,12 @@ func FanOutWith[T any](n int, router func(T) int, stream core.Stream[T]) []core.
 	}
 
 	outputs := make([]core.Stream[T], n)
-	channels := make([]chan *core.Result[T], n)
+	channels := make([]chan core.Result[T], n)
 
 	for i := 0; i < n; i++ {
-		ch := make(chan *core.Result[T], 16)
+		ch := make(chan core.Result[T], 16)
 		channels[i] = ch
-		outputs[i] = core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
+		outputs[i] = core.Emit(func(ctx context.Context) <-chan core.Result[T] {
 			return ch
 		})
 	}
@@ -111,8 +111,8 @@ func FanIn[T any](streams ...core.Stream[T]) core.Stream[T] {
 // Returns a stream of the original items after broadcasting.
 // Useful for side effects like logging, metrics, or caching.
 func Broadcast[T any](handlers ...func(T)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -151,13 +151,13 @@ func RoundRobin[IN, OUT any](n int, worker func(IN) OUT) core.Transformer[IN, OU
 		n = 1
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[IN]) <-chan *core.Result[OUT] {
-		out := make(chan *core.Result[OUT])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		out := make(chan core.Result[OUT])
 
 		// Create worker channels
-		workerChans := make([]chan *core.Result[IN], n)
+		workerChans := make([]chan core.Result[IN], n)
 		for i := 0; i < n; i++ {
-			workerChans[i] = make(chan *core.Result[IN], 16)
+			workerChans[i] = make(chan core.Result[IN], 16)
 		}
 
 		go func() {
@@ -168,7 +168,7 @@ func RoundRobin[IN, OUT any](n int, worker func(IN) OUT) core.Transformer[IN, OU
 			// Start workers
 			for i := 0; i < n; i++ {
 				wg.Add(1)
-				go func(workerChan <-chan *core.Result[IN]) {
+				go func(workerChan <-chan core.Result[IN]) {
 					defer wg.Done()
 					for res := range workerChan {
 						if res.IsError() {
@@ -250,12 +250,12 @@ func Balance[T any](n int, stream core.Stream[T]) []core.Stream[T] {
 	}
 
 	outputs := make([]core.Stream[T], n)
-	channels := make([]chan *core.Result[T], n)
+	channels := make([]chan core.Result[T], n)
 
 	for i := 0; i < n; i++ {
-		ch := make(chan *core.Result[T], 1) // Small buffer for balancing
+		ch := make(chan core.Result[T], 1) // Small buffer for balancing
 		channels[i] = ch
-		outputs[i] = core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
+		outputs[i] = core.Emit(func(ctx context.Context) <-chan core.Result[T] {
 			return ch
 		})
 	}

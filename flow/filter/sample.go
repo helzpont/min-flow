@@ -15,13 +15,14 @@ import (
 // SampleWith creates a Transformer that emits the most recent item from the source
 // whenever the sampler stream emits. Items from the source between samples are dropped.
 func SampleWith[T, S any](sampler core.Stream[S]) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
 			samplerCh := sampler.Emit(ctx)
-			var lastItem *core.Result[T]
+			var lastItem core.Result[T]
+			var hasLastItem bool
 			var mu sync.Mutex
 
 			for {
@@ -35,10 +36,11 @@ func SampleWith[T, S any](sampler core.Stream[S]) core.Transformer[T, T] {
 					}
 					mu.Lock()
 					item := lastItem
-					lastItem = nil
+					hasItem := hasLastItem
+					hasLastItem = false
 					mu.Unlock()
 
-					if item != nil {
+					if hasItem {
 						select {
 						case <-ctx.Done():
 							return
@@ -65,6 +67,7 @@ func SampleWith[T, S any](sampler core.Stream[S]) core.Transformer[T, T] {
 
 					mu.Lock()
 					lastItem = res
+					hasLastItem = true
 					mu.Unlock()
 				}
 			}
@@ -76,14 +79,15 @@ func SampleWith[T, S any](sampler core.Stream[S]) core.Transformer[T, T] {
 // AuditTime creates a Transformer that, when the source emits, waits for the
 // specified duration, then emits the most recent value from the source.
 func AuditTime[T any](d time.Duration) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
 			var timer *time.Timer
 			var timerC <-chan time.Time
-			var lastItem *core.Result[T]
+			var lastItem core.Result[T]
+			var hasLastItem bool
 
 			for {
 				select {
@@ -94,13 +98,13 @@ func AuditTime[T any](d time.Duration) core.Transformer[T, T] {
 					return
 
 				case <-timerC:
-					if lastItem != nil {
+					if hasLastItem {
 						select {
 						case <-ctx.Done():
 							return
 						case out <- lastItem:
 						}
-						lastItem = nil
+						hasLastItem = false
 					}
 					timer = nil
 					timerC = nil
@@ -125,6 +129,7 @@ func AuditTime[T any](d time.Duration) core.Transformer[T, T] {
 					}
 
 					lastItem = res
+					hasLastItem = true
 					if timer == nil {
 						timer = time.NewTimer(d)
 						timerC = timer.C
@@ -140,15 +145,16 @@ func AuditTime[T any](d time.Duration) core.Transformer[T, T] {
 // then emits the last item received during that period, and repeats.
 // If no items are received during a period, nothing is emitted for that period.
 func ThrottleLast[T any](d time.Duration) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
 			ticker := time.NewTicker(d)
 			defer ticker.Stop()
 
-			var lastItem *core.Result[T]
+			var lastItem core.Result[T]
+			var hasLastItem bool
 			var mu sync.Mutex
 
 			for {
@@ -159,10 +165,11 @@ func ThrottleLast[T any](d time.Duration) core.Transformer[T, T] {
 				case <-ticker.C:
 					mu.Lock()
 					item := lastItem
-					lastItem = nil
+					hasItem := hasLastItem
+					hasLastItem = false
 					mu.Unlock()
 
-					if item != nil {
+					if hasItem {
 						select {
 						case <-ctx.Done():
 							return
@@ -175,8 +182,9 @@ func ThrottleLast[T any](d time.Duration) core.Transformer[T, T] {
 						// Emit last item before closing
 						mu.Lock()
 						item := lastItem
+						hasItem := hasLastItem
 						mu.Unlock()
-						if item != nil {
+						if hasItem {
 							select {
 							case <-ctx.Done():
 							case out <- item:
@@ -198,6 +206,7 @@ func ThrottleLast[T any](d time.Duration) core.Transformer[T, T] {
 
 					mu.Lock()
 					lastItem = res
+					hasLastItem = true
 					mu.Unlock()
 				}
 			}
@@ -209,8 +218,8 @@ func ThrottleLast[T any](d time.Duration) core.Transformer[T, T] {
 // DistinctUntilChanged creates a Transformer that only emits when the current item
 // is different from the previous item.
 func DistinctUntilChanged[T comparable]() core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -257,8 +266,8 @@ func DistinctUntilChanged[T comparable]() core.Transformer[T, T] {
 // DistinctUntilChangedBy creates a Transformer that only emits when the key
 // derived from the current item is different from the key of the previous item.
 func DistinctUntilChangedBy[T any, K comparable](keyFn func(T) K) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -307,8 +316,8 @@ func DistinctUntilChangedBy[T any, K comparable](keyFn func(T) K) core.Transform
 func RandomSample[T any](probability float64) core.Transformer[T, T] {
 	if probability <= 0 {
 		// Emit nothing
-		return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-			out := make(chan *core.Result[T])
+		return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+			out := make(chan core.Result[T])
 			go func() {
 				defer close(out)
 				for range in {
@@ -319,8 +328,8 @@ func RandomSample[T any](probability float64) core.Transformer[T, T] {
 	}
 	if probability >= 1 {
 		// Emit everything
-		return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-			out := make(chan *core.Result[T])
+		return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+			out := make(chan core.Result[T])
 			go func() {
 				defer close(out)
 				for res := range in {
@@ -335,8 +344,8 @@ func RandomSample[T any](probability float64) core.Transformer[T, T] {
 		})
 	}
 
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -382,8 +391,8 @@ func ReservoirSample[T any](k int) core.Transformer[T, []T] {
 	if k <= 0 {
 		k = 1
 	}
-	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[[]T] {
-		out := make(chan *core.Result[[]T])
+	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
 
@@ -446,8 +455,8 @@ func EveryNth[T any](n int) core.Transformer[T, T] {
 	if n <= 0 {
 		n = 1
 	}
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			count := 0

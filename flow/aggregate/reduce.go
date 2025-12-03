@@ -12,8 +12,8 @@ import (
 // The first item becomes the initial accumulator value.
 // If the stream is empty, nothing is emitted.
 func Reduce[T any](reducer func(acc, item T) T) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			var acc T
@@ -62,8 +62,8 @@ func Reduce[T any](reducer func(acc, item T) T) core.Transformer[T, T] {
 // using the provided folder function and initial value.
 // Unlike Reduce, Fold always emits a value (the initial value if stream is empty).
 func Fold[T, R any](initial R, folder func(acc R, item T) R) core.Transformer[T, R] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[R] {
-		out := make(chan *core.Result[R])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[R] {
+		out := make(chan core.Result[R])
 		go func() {
 			defer close(out)
 			acc := initial
@@ -104,8 +104,8 @@ func Fold[T, R any](initial R, folder func(acc R, item T) R) core.Transformer[T,
 // Like Fold, but emits after each item rather than only at the end.
 // The initial value is NOT emitted - only values after processing items.
 func Scan[T, R any](initial R, scanner func(acc R, item T) R) core.Transformer[T, R] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[R] {
-		out := make(chan *core.Result[R])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[R] {
+		out := make(chan core.Result[R])
 		go func() {
 			defer close(out)
 			acc := initial
@@ -153,8 +153,8 @@ func Count[T any]() core.Transformer[T, int] {
 // Works with any numeric type that supports addition.
 // Emits a single value when the stream completes.
 func Sum[T Numeric]() core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			var sum T
@@ -202,8 +202,8 @@ type Numeric interface {
 // Emits a single float64 value when the stream completes.
 // If the stream is empty, emits 0.
 func Average[T Numeric]() core.Transformer[T, float64] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[float64] {
-		out := make(chan *core.Result[float64])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[float64] {
+		out := make(chan core.Result[float64])
 		go func() {
 			defer close(out)
 			var sum float64
@@ -251,8 +251,8 @@ func Average[T Numeric]() core.Transformer[T, float64] {
 // Uses the provided less function to compare values.
 // If the stream is empty, nothing is emitted.
 func Min[T any](less func(a, b T) bool) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			var min T
@@ -299,8 +299,8 @@ func Min[T any](less func(a, b T) bool) core.Transformer[T, T] {
 // Uses the provided less function to compare values (finds the value where !less(result, x) for all x).
 // If the stream is empty, nothing is emitted.
 func Max[T any](less func(a, b T) bool) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			var max T
@@ -347,8 +347,8 @@ func Max[T any](less func(a, b T) bool) core.Transformer[T, T] {
 // Emits true if all items match (or if stream is empty), false otherwise.
 // Short-circuits on first non-matching item.
 func All[T any](predicate func(T) bool) core.Transformer[T, bool] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 			result := true
@@ -395,8 +395,8 @@ func All[T any](predicate func(T) bool) core.Transformer[T, bool] {
 // Emits true if at least one item matches, false otherwise.
 // Short-circuits on first matching item.
 func Any[T any](predicate func(T) bool) core.Transformer[T, bool] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 			result := false
@@ -443,8 +443,8 @@ func Any[T any](predicate func(T) bool) core.Transformer[T, bool] {
 // Emits true if no items match (or if stream is empty), false otherwise.
 // Short-circuits on first matching item.
 func None[T any](predicate func(T) bool) core.Transformer[T, bool] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 			result := true

@@ -14,8 +14,8 @@ import (
 func TestOnError(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -118,8 +118,8 @@ func TestCatchError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-				out := make(chan *core.Result[int])
+			emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+				out := make(chan core.Result[int])
 				go func() {
 					defer close(out)
 					for _, err := range tt.errors {
@@ -163,8 +163,8 @@ func TestFilterErrors(t *testing.T) {
 	errToFilter := errors.New("filter me")
 	errToKeep := errors.New("keep me")
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -213,8 +213,8 @@ func TestFilterErrors(t *testing.T) {
 func TestIgnoreErrors(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -247,8 +247,8 @@ func TestIgnoreErrors(t *testing.T) {
 func TestMapErrors(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -289,8 +289,8 @@ func TestMapErrors(t *testing.T) {
 func TestWrapError(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Err[int](errors.New("inner"))
@@ -319,8 +319,8 @@ func TestWrapError(t *testing.T) {
 func TestErrorsOnly(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -362,8 +362,8 @@ func TestErrorsOnly(t *testing.T) {
 func TestMaterialize(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -407,8 +407,8 @@ func TestDematerialize(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a stream of Materialized values
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[flowerrors.Materialized[int]] {
-		out := make(chan *core.Result[flowerrors.Materialized[int]])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[flowerrors.Materialized[int]] {
+		out := make(chan core.Result[flowerrors.Materialized[int]])
 		go func() {
 			defer close(out)
 			out <- core.Ok(flowerrors.Materialized[int]{Value: 1, IsValue: true})
@@ -445,8 +445,8 @@ func TestDematerialize(t *testing.T) {
 func TestCountErrors(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -475,8 +475,8 @@ func TestCountErrors(t *testing.T) {
 func TestThrowOnError(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -519,8 +519,8 @@ func TestErrorContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 100; i++ {

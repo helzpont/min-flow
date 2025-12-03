@@ -17,8 +17,8 @@ func Buffer[T any](size int) core.Transformer[T, T] {
 		size = 1
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T], size)
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T], size)
 
 		go func() {
 			defer close(out)
@@ -39,14 +39,15 @@ func Buffer[T any](size int) core.Transformer[T, T] {
 // has passed without another item arriving. Useful for handling bursts of events
 // where only the last event in a burst matters.
 func Debounce[T any](duration time.Duration) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
 
 			var timer *time.Timer
-			var pending *core.Result[T]
+			var pending core.Result[T]
+			var hasPending bool
 			var mu sync.Mutex
 
 			timerChan := make(chan struct{})
@@ -63,7 +64,7 @@ func Debounce[T any](duration time.Duration) core.Transformer[T, T] {
 					if !ok {
 						// Emit any pending item before closing
 						mu.Lock()
-						if pending != nil {
+						if hasPending {
 							select {
 							case out <- pending:
 							case <-ctx.Done():
@@ -88,6 +89,7 @@ func Debounce[T any](duration time.Duration) core.Transformer[T, T] {
 
 					mu.Lock()
 					pending = res
+					hasPending = true
 					if timer != nil {
 						timer.Stop()
 					}
@@ -101,14 +103,14 @@ func Debounce[T any](duration time.Duration) core.Transformer[T, T] {
 
 				case <-timerChan:
 					mu.Lock()
-					if pending != nil {
+					if hasPending {
 						select {
 						case out <- pending:
 						case <-ctx.Done():
 							mu.Unlock()
 							return
 						}
-						pending = nil
+						hasPending = false
 					}
 					mu.Unlock()
 				}
@@ -123,8 +125,8 @@ func Debounce[T any](duration time.Duration) core.Transformer[T, T] {
 // The first item passes through immediately, then subsequent items are dropped
 // until the duration has elapsed.
 func Throttle[T any](duration time.Duration) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -162,13 +164,14 @@ func Throttle[T any](duration time.Duration) core.Transformer[T, T] {
 // ThrottleLatest is like Throttle but keeps the latest item during the throttle period.
 // When the period ends, it emits the most recent item received during that period.
 func ThrottleLatest[T any](duration time.Duration) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
 
-			var pending *core.Result[T]
+			var pending core.Result[T]
+			var hasPending bool
 			var mu sync.Mutex
 			ticker := time.NewTicker(duration)
 			defer ticker.Stop()
@@ -185,7 +188,7 @@ func ThrottleLatest[T any](duration time.Duration) core.Transformer[T, T] {
 					if !ok {
 						// Emit any pending before closing
 						mu.Lock()
-						if pending != nil {
+						if hasPending {
 							select {
 							case out <- pending:
 							case <-ctx.Done():
@@ -214,19 +217,20 @@ func ThrottleLatest[T any](duration time.Duration) core.Transformer[T, T] {
 					} else {
 						mu.Lock()
 						pending = res
+						hasPending = true
 						mu.Unlock()
 					}
 
 				case <-ticker.C:
 					mu.Lock()
-					if pending != nil {
+					if hasPending {
 						select {
 						case out <- pending:
 						case <-ctx.Done():
 							mu.Unlock()
 							return
 						}
-						pending = nil
+						hasPending = false
 					}
 					mu.Unlock()
 				}
@@ -244,8 +248,8 @@ func RateLimit[T any](n int, per time.Duration) core.Transformer[T, T] {
 		n = 1
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -313,8 +317,8 @@ func RateLimit[T any](n int, per time.Duration) core.Transformer[T, T] {
 
 // Delay creates a Transformer that delays each item by the specified duration.
 func Delay[T any](duration time.Duration) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -341,13 +345,14 @@ func Delay[T any](duration time.Duration) core.Transformer[T, T] {
 // Sample creates a Transformer that emits the most recent item at regular intervals.
 // Items received between intervals are discarded except for the latest.
 func Sample[T any](interval time.Duration) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
 
-			var latest *core.Result[T]
+			var latest core.Result[T]
+			var hasLatest bool
 			var mu sync.Mutex
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
@@ -367,6 +372,7 @@ func Sample[T any](interval time.Duration) core.Transformer[T, T] {
 
 					mu.Lock()
 					latest = res
+					hasLatest = true
 					mu.Unlock()
 				}
 				close(done)
@@ -379,7 +385,7 @@ func Sample[T any](interval time.Duration) core.Transformer[T, T] {
 				case <-done:
 					// Emit final sample if any
 					mu.Lock()
-					if latest != nil {
+					if hasLatest {
 						select {
 						case out <- latest:
 						case <-ctx.Done():
@@ -389,14 +395,14 @@ func Sample[T any](interval time.Duration) core.Transformer[T, T] {
 					return
 				case <-ticker.C:
 					mu.Lock()
-					if latest != nil {
+					if hasLatest {
 						select {
 						case out <- latest:
 						case <-ctx.Done():
 							mu.Unlock()
 							return
 						}
-						latest = nil
+						hasLatest = false
 					}
 					mu.Unlock()
 				}
@@ -410,8 +416,8 @@ func Sample[T any](interval time.Duration) core.Transformer[T, T] {
 // After creates a Transformer that errors if no item is received within the duration.
 // The timeout resets after each item. If the timeout expires, an error is emitted.
 func After[T any](duration time.Duration) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)

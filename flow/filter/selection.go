@@ -20,8 +20,8 @@ func Find[T any](predicate func(T) bool) core.Transformer[T, FindResult[T]] {
 	if predicate == nil {
 		panic("Find: predicate cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[FindResult[T]] {
-		out := make(chan *core.Result[FindResult[T]])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[FindResult[T]] {
+		out := make(chan core.Result[FindResult[T]])
 		go func() {
 			defer close(out)
 
@@ -62,8 +62,8 @@ func FindIndex[T any](predicate func(T) bool) core.Transformer[T, int] {
 	if predicate == nil {
 		panic("FindIndex: predicate cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 
@@ -105,8 +105,8 @@ func FindLast[T any](predicate func(T) bool) core.Transformer[T, FindResult[T]] 
 	if predicate == nil {
 		panic("FindLast: predicate cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[FindResult[T]] {
-		out := make(chan *core.Result[FindResult[T]])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[FindResult[T]] {
+		out := make(chan core.Result[FindResult[T]])
 		go func() {
 			defer close(out)
 
@@ -153,8 +153,8 @@ func FindLastIndex[T any](predicate func(T) bool) core.Transformer[T, int] {
 	if predicate == nil {
 		panic("FindLastIndex: predicate cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 
@@ -190,8 +190,8 @@ func FindLastIndex[T any](predicate func(T) bool) core.Transformer[T, int] {
 // Contains creates a Transformer that checks if the stream contains a specific value.
 // Uses the == operator for comparison (values must be comparable).
 func Contains[T comparable](value T) core.Transformer[T, bool] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 
@@ -230,8 +230,8 @@ func ContainsBy[T any](predicate func(T) bool) core.Transformer[T, bool] {
 	if predicate == nil {
 		panic("ContainsBy: predicate cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 
@@ -268,8 +268,8 @@ func ContainsBy[T any](predicate func(T) bool) core.Transformer[T, bool] {
 // IsEmpty creates a Transformer that checks if the stream contains no values.
 // Emits true if empty, false otherwise.
 func IsEmpty[T any]() core.Transformer[T, bool] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 
@@ -305,8 +305,8 @@ func IsEmpty[T any]() core.Transformer[T, bool] {
 // IsNotEmpty creates a Transformer that checks if the stream contains at least one value.
 // Emits true if not empty, false otherwise.
 func IsNotEmpty[T any]() core.Transformer[T, bool] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 
@@ -342,8 +342,8 @@ func IsNotEmpty[T any]() core.Transformer[T, bool] {
 // SequenceEqual creates a Transformer that compares the source stream with another stream.
 // Emits true if both streams have the same elements in the same order.
 func SequenceEqual[T comparable](other core.Stream[T]) core.Transformer[T, bool] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 
@@ -432,8 +432,8 @@ func SequenceEqualBy[T any](other core.Stream[T], equals func(T, T) bool) core.T
 	if equals == nil {
 		panic("SequenceEqualBy: equals function cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 		go func() {
 			defer close(out)
 
@@ -518,8 +518,8 @@ func SequenceEqualBy[T any](other core.Stream[T], equals func(T, T) bool) core.T
 // CountIf creates a Transformer that counts elements matching the predicate.
 // If predicate is nil, counts all elements.
 func CountIf[T any](predicate func(T) bool) core.Transformer[T, int] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 
@@ -553,8 +553,8 @@ func CountIf[T any](predicate func(T) bool) core.Transformer[T, int] {
 // IndexOf creates a Transformer that emits the index of a specific value.
 // If not found, emits -1.
 func IndexOf[T comparable](value T) core.Transformer[T, int] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 
@@ -593,8 +593,8 @@ func IndexOf[T comparable](value T) core.Transformer[T, int] {
 // LastIndexOf creates a Transformer that emits the last index of a specific value.
 // If not found, emits -1.
 func LastIndexOf[T comparable](value T) core.Transformer[T, int] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 

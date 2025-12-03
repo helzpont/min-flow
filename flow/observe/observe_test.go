@@ -141,7 +141,7 @@ func TestSpy(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3})
 
 	var spyCount int
-	result := observe.Spy(func(res *flow.Result[int]) {
+	result := observe.Spy(func(res flow.Result[int]) {
 		if res.IsValue() {
 			spyCount++
 		}

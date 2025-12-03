@@ -24,8 +24,8 @@ func Retry[T any](maxRetries int, operation func(T) (T, error)) core.Transformer
 		maxRetries = 0
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -123,8 +123,8 @@ func RetryWithBackoff[T any](maxRetries int, backoff BackoffStrategy, operation 
 		maxRetries = 0
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -202,8 +202,8 @@ func RetryWhen[T any](maxRetries int, shouldRetry func(err error, attempt int) b
 		maxRetries = 0
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -383,8 +383,8 @@ func (cb *CircuitBreaker[T]) State() CircuitState {
 
 // WithCircuitBreaker creates a Transformer that applies a circuit breaker to operations.
 func WithCircuitBreaker[T any](cb *CircuitBreaker[T]) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -429,8 +429,8 @@ func WithCircuitBreaker[T any](cb *CircuitBreaker[T]) core.Transformer[T, T] {
 // Fallback creates a Transformer that provides a fallback value when an error occurs.
 // The fallback function receives the original value and the error.
 func Fallback[T any](fallbackFn func(T, error) T) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -497,8 +497,8 @@ func FallbackValue[T any](defaultValue T) core.Transformer[T, T] {
 // Recover creates a Transformer that recovers from errors using a recovery function.
 // The recovery function can return a new value or return an error to propagate.
 func Recover[T any](recoverFn func(error) (T, error)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)

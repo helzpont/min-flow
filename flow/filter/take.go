@@ -10,8 +10,8 @@ import (
 // After n items have been emitted, the stream completes.
 // If n <= 0, an empty stream is returned.
 func Take[T any](n int) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			if n <= 0 {
@@ -43,8 +43,8 @@ func Take[T any](n int) core.Transformer[T, T] {
 // Once the predicate returns false, the stream completes (remaining items are not consumed).
 // Errors are passed through but don't affect the predicate evaluation.
 func TakeWhile[T any](predicate func(T) bool) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			for res := range in {
@@ -77,8 +77,8 @@ func TakeWhile[T any](predicate func(T) bool) core.Transformer[T, T] {
 // Skip creates a Transformer that skips the first n items, then passes through the rest.
 // If n <= 0, all items are passed through.
 func Skip[T any](n int) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			skipped := 0
@@ -114,8 +114,8 @@ func Skip[T any](n int) core.Transformer[T, T] {
 // Once the predicate returns false, all subsequent items (including the first false one) are passed through.
 // Errors are passed through but don't affect the predicate evaluation.
 func SkipWhile[T any](predicate func(T) bool) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			skipping := true
@@ -152,8 +152,8 @@ func SkipWhile[T any](predicate func(T) bool) core.Transformer[T, T] {
 // This requires buffering up to n items, so it waits until the stream completes.
 // If n <= 0, an empty stream is returned.
 func Last[T any](n int) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			if n <= 0 {
@@ -164,7 +164,7 @@ func Last[T any](n int) core.Transformer[T, T] {
 			}
 
 			// Ring buffer for last n items
-			buffer := make([]*core.Result[T], 0, n)
+			buffer := make([]core.Result[T], 0, n)
 
 			for res := range in {
 				// Pass through errors and sentinels immediately
@@ -209,8 +209,8 @@ func First[T any]() core.Transformer[T, T] {
 // Nth creates a Transformer that only emits the nth item (0-indexed) from the stream.
 // If the stream has fewer than n+1 items, nothing is emitted.
 func Nth[T any](n int) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			if n < 0 {

@@ -10,8 +10,8 @@ import (
 // DoOnNext creates a Transformer that calls a handler function for each successful value.
 // The handler is called for side effects only; values pass through unchanged.
 func DoOnNext[T any](handler func(T)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -42,8 +42,8 @@ func DoOnNext[T any](handler func(T)) core.Transformer[T, T] {
 // DoOnError creates a Transformer that calls a handler function for each error.
 // The handler is called for side effects only; errors pass through unchanged.
 func DoOnError[T any](handler func(error)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -75,8 +75,8 @@ func DoOnError[T any](handler func(error)) core.Transformer[T, T] {
 // The handler is called for side effects only; the stream passes through unchanged.
 // The handler is called whether the stream completes normally, with errors, or via cancellation.
 func DoOnComplete[T any](handler func()) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -103,9 +103,9 @@ func DoOnComplete[T any](handler func()) core.Transformer[T, T] {
 
 // DoOnEach creates a Transformer that calls a handler function for each Result (value, error, or sentinel).
 // The handler is called for side effects only; results pass through unchanged.
-func DoOnEach[T any](handler func(*core.Result[T])) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+func DoOnEach[T any](handler func(core.Result[T])) core.Transformer[T, T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -142,8 +142,8 @@ type TapHandlers[T any] struct {
 // Tap creates a Transformer with the given handlers.
 // Nil handlers are safely ignored.
 func Tap[T any](handlers TapHandlers[T]) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -189,8 +189,8 @@ func Finally[T any](cleanup func()) core.Transformer[T, T] {
 // DoOnSubscribe creates a Transformer that calls a handler when the stream starts processing.
 // The handler is called once at the beginning of stream consumption.
 func DoOnSubscribe[T any](handler func()) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -219,8 +219,8 @@ func DoOnSubscribe[T any](handler func()) core.Transformer[T, T] {
 
 // DoOnCancel creates a Transformer that calls a handler when the stream is cancelled via context.
 func DoOnCancel[T any](handler func()) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -259,8 +259,8 @@ func DoOnCancel[T any](handler func()) core.Transformer[T, T] {
 // CountValues creates a Transformer that counts items passing through and provides the count on completion.
 // Values pass through unchanged. The count callback is called when the stream completes.
 func CountValues[T any](onCount func(int64)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -297,8 +297,8 @@ func CountValues[T any](onCount func(int64)) core.Transformer[T, T] {
 // CountAll creates a Transformer that counts all results (including errors and sentinels).
 // The count callback is called when the stream completes.
 func CountAll[T any](onCount func(values, errors, sentinels int64)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -358,19 +358,20 @@ const (
 )
 
 // Trace creates a Transformer that traces stream events.
-func Trace[T any](tracer func(event TraceEvent, result *core.Result[T])) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+func Trace[T any](tracer func(event TraceEvent, result core.Result[T])) core.Transformer[T, T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
 
+			var zeroResult core.Result[T]
 			defer func() {
 				select {
 				case <-ctx.Done():
-					tracer(TraceCancel, nil)
+					tracer(TraceCancel, zeroResult)
 				default:
-					tracer(TraceComplete, nil)
+					tracer(TraceComplete, zeroResult)
 				}
 			}()
 
@@ -408,7 +409,7 @@ type Notification[T any] struct {
 	Kind   NotificationKind
 	Value  T
 	Error  error
-	Result *core.Result[T]
+	Result core.Result[T]
 }
 
 type NotificationKind int
@@ -422,8 +423,8 @@ const (
 
 // MaterializeNotification converts a stream of T into a stream of Notification[T].
 func MaterializeNotification[T any]() core.Transformer[T, Notification[T]] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[Notification[T]] {
-		out := make(chan *core.Result[Notification[T]])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[Notification[T]] {
+		out := make(chan core.Result[Notification[T]])
 
 		go func() {
 			defer close(out)
@@ -479,8 +480,8 @@ func MaterializeNotification[T any]() core.Transformer[T, Notification[T]] {
 
 // DematerializeNotification converts a stream of Notification[T] back into a stream of T.
 func DematerializeNotification[T any]() core.Transformer[Notification[T], T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[Notification[T]]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[Notification[T]]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -499,7 +500,7 @@ func DematerializeNotification[T any]() core.Transformer[Notification[T], T] {
 
 				notification := res.Value()
 
-				var result *core.Result[T]
+				var result core.Result[T]
 				switch notification.Kind {
 				case NotificationValue:
 					result = core.Ok(notification.Value)

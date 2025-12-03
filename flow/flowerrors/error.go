@@ -9,8 +9,8 @@ import (
 // OnError creates a Transformer that calls a handler function when an error occurs.
 // The handler is called for side effects; the error still passes through the stream.
 func OnError[T any](handler func(error)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -42,8 +42,8 @@ func OnError[T any](handler func(error)) core.Transformer[T, T] {
 // If the handler returns a value, it replaces the error. If the handler returns an error,
 // that error propagates. Non-matching errors pass through unchanged.
 func CatchError[T any](predicate func(error) bool, handler func(error) (T, error)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -88,8 +88,8 @@ func CatchError[T any](predicate func(error) bool, handler func(error) (T, error
 // FilterErrors creates a Transformer that filters out errors matching a predicate.
 // Matching errors are silently dropped; non-matching errors pass through.
 func FilterErrors[T any](predicate func(error) bool) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -129,8 +129,8 @@ func IgnoreErrors[T any]() core.Transformer[T, T] {
 // MapErrors creates a Transformer that transforms errors using a mapping function.
 // Values and sentinels pass through unchanged.
 func MapErrors[T any](mapper func(error) error) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -172,8 +172,8 @@ func WrapError[T any](wrapper func(error) error) core.Transformer[T, T] {
 // ErrorsOnly creates a Transformer that only passes through error results.
 // Values and sentinels are dropped. Useful for error-focused processing.
 func ErrorsOnly[T any]() core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -211,8 +211,8 @@ type Materialized[T any] struct {
 // Materialize creates a Transformer that wraps all results in a Materialized struct.
 // This allows downstream processors to handle both values and errors uniformly.
 func Materialize[T any]() core.Transformer[T, Materialized[T]] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[Materialized[T]] {
-		out := make(chan *core.Result[Materialized[T]])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[Materialized[T]] {
+		out := make(chan core.Result[Materialized[T]])
 
 		go func() {
 			defer close(out)
@@ -254,8 +254,8 @@ func Materialize[T any]() core.Transformer[T, Materialized[T]] {
 
 // Dematerialize creates a Transformer that unwraps Materialized values back to regular results.
 func Dematerialize[T any]() core.Transformer[Materialized[T], T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[Materialized[T]]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[Materialized[T]]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -309,8 +309,8 @@ func Dematerialize[T any]() core.Transformer[Materialized[T], T] {
 // CountErrors creates a Transformer that counts errors and adds the count to a provided counter.
 // Errors still pass through the stream.
 func CountErrors[T any](counter *int64) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -341,8 +341,8 @@ func CountErrors[T any](counter *int64) core.Transformer[T, T] {
 // ThrowOnError creates a Transformer that stops the stream on the first error.
 // This is useful when any error should halt processing.
 func ThrowOnError[T any]() core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)

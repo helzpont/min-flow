@@ -11,8 +11,8 @@ import (
 // Where creates a Transformer that only passes through items matching the predicate.
 // Items that don't match are silently dropped. Errors are passed through unchanged.
 func Where[T any](predicate func(T) bool) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			for res := range in {
@@ -44,8 +44,8 @@ func Where[T any](predicate func(T) bool) core.Transformer[T, T] {
 // The function returns (value, true) to include the transformed value,
 // or (_, false) to filter out the item. Errors in the input are passed through.
 func MapWhere[IN, OUT any](fn func(IN) (OUT, bool)) core.Transformer[IN, OUT] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[IN]) <-chan *core.Result[OUT] {
-		out := make(chan *core.Result[OUT])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+		out := make(chan core.Result[OUT])
 		go func() {
 			defer close(out)
 			for res := range in {
@@ -86,8 +86,8 @@ func MapWhere[IN, OUT any](fn func(IN) (OUT, bool)) core.Transformer[IN, OUT] {
 // Errors creates a Transformer that filters out errors from the stream.
 // Only values (non-error, non-sentinel results) pass through.
 func Errors[T any]() core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 			for res := range in {

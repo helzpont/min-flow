@@ -138,8 +138,8 @@ func TestWindowWithBoundary(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a boundary stream that emits every 50ms
-	boundary := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	boundary := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 3; i++ {
@@ -155,8 +155,8 @@ func TestWindowWithBoundary(t *testing.T) {
 	})
 
 	// Create source that emits items faster than boundary
-	source := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	source := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 1; i <= 6; i++ {
@@ -261,8 +261,8 @@ func TestWindowTimeWithErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			out <- flow.Ok(1)
@@ -341,8 +341,8 @@ func TestSessionWindowWithErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			out <- flow.Ok(1)
@@ -381,8 +381,8 @@ func TestGroupByTimeWithErrors(t *testing.T) {
 		Time  time.Time
 	}
 
-	emitter := flow.Emitter[Item](func(ctx context.Context) <-chan *flow.Result[Item] {
-		out := make(chan *flow.Result[Item])
+	emitter := flow.Emitter[Item](func(ctx context.Context) <-chan flow.Result[Item] {
+		out := make(chan flow.Result[Item])
 		go func() {
 			defer close(out)
 			out <- flow.Ok(Item{1, now})
@@ -420,8 +420,8 @@ func TestHoppingWindowWithErrors(t *testing.T) {
 
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 5; i++ {

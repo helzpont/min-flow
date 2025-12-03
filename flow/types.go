@@ -45,27 +45,27 @@ var ErrEndOfStream = core.ErrEndOfStream
 // Result constructors - wrappers around core functions.
 
 // Ok creates a successful Result containing the given value.
-func Ok[T any](value T) *Result[T] {
+func Ok[T any](value T) Result[T] {
 	return core.Ok(value)
 }
 
 // Err creates an error Result for recoverable processing failures.
-func Err[T any](err error) *Result[T] {
+func Err[T any](err error) Result[T] {
 	return core.Err[T](err)
 }
 
 // Sentinel creates a sentinel Result for stream control signals.
-func Sentinel[T any](err error) *Result[T] {
+func Sentinel[T any](err error) Result[T] {
 	return core.Sentinel[T](err)
 }
 
 // EndOfStream creates a sentinel indicating normal stream termination.
-func EndOfStream[T any]() *Result[T] {
+func EndOfStream[T any]() Result[T] {
 	return core.EndOfStream[T]()
 }
 
 // NewResult creates a Result with explicit control over all fields.
-func NewResult[T any](value T, err error, isSentinel bool) *Result[T] {
+func NewResult[T any](value T, err error, isSentinel bool) Result[T] {
 	return core.NewResult(value, err, isSentinel)
 }
 
@@ -99,23 +99,23 @@ func Run[T any](ctx context.Context, in Stream[T]) error {
 }
 
 // Collect gathers all Results (including errors) into a slice.
-func Collect[T any](ctx context.Context, stream Stream[T]) []*Result[T] {
+func Collect[T any](ctx context.Context, stream Stream[T]) []Result[T] {
 	return core.Collect(ctx, stream)
 }
 
 // All returns an iterator over all Results in the stream.
-func All[T any](ctx context.Context, stream Stream[T]) iter.Seq[*Result[T]] {
+func All[T any](ctx context.Context, stream Stream[T]) iter.Seq[Result[T]] {
 	return core.All(ctx, stream)
 }
 
 // Emitter/Transmitter constructors.
 
 // Emit creates an Emitter from a channel-producing function.
-func Emit[T any](emitter func(context.Context) <-chan *Result[T]) Emitter[T] {
+func Emit[T any](emitter func(context.Context) <-chan Result[T]) Emitter[T] {
 	return core.Emit(emitter)
 }
 
 // Transmit creates a Transmitter from a channel transformation function.
-func Transmit[IN, OUT any](transmitter func(context.Context, <-chan *Result[IN]) <-chan *Result[OUT]) Transmitter[IN, OUT] {
+func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) <-chan Result[OUT]) Transmitter[IN, OUT] {
 	return core.Transmit(transmitter)
 }

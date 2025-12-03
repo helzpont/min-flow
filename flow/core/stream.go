@@ -18,22 +18,22 @@ import (
 // pipelines.
 // Stream answers the question: "What operations will produce the stream's data?".
 type Stream[OUT any] interface {
-	Emit(context.Context) <-chan *Result[OUT]
+	Emit(context.Context) <-chan Result[OUT]
 
-	Collect(context.Context) []*Result[OUT]
-	All(context.Context) iter.Seq[*Result[OUT]]
+	Collect(context.Context) []Result[OUT]
+	All(context.Context) iter.Seq[Result[OUT]]
 }
 
-func Collect[OUT any](ctx context.Context, stream Stream[OUT]) []*Result[OUT] {
-	var results []*Result[OUT]
+func Collect[OUT any](ctx context.Context, stream Stream[OUT]) []Result[OUT] {
+	var results []Result[OUT]
 	for res := range stream.Emit(ctx) {
 		results = append(results, res)
 	}
 	return results
 }
 
-func All[OUT any](ctx context.Context, stream Stream[OUT]) iter.Seq[*Result[OUT]] {
-	return func(yield func(*Result[OUT]) bool) {
+func All[OUT any](ctx context.Context, stream Stream[OUT]) iter.Seq[Result[OUT]] {
+	return func(yield func(Result[OUT]) bool) {
 		for res := range stream.Emit(ctx) {
 			if !yield(res) {
 				return

@@ -22,8 +22,8 @@ func TakeWhileWithIndex[T any](predicate func(T, int) bool) core.Transformer[T, 
 	if predicate == nil {
 		panic("TakeWhileWithIndex: predicate cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -63,8 +63,8 @@ func SkipWhileWithIndex[T any](predicate func(T, int) bool) core.Transformer[T, 
 	if predicate == nil {
 		panic("SkipWhileWithIndex: predicate cannot be nil")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -106,8 +106,8 @@ func SkipWhileWithIndex[T any](predicate func(T, int) bool) core.Transformer[T, 
 // TakeUntil creates a Transformer that emits values until the notifier stream emits.
 // When the notifier emits any value, the source stream completes.
 func TakeUntil[T, N any](notifier core.Stream[N]) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -156,8 +156,8 @@ func TakeUntil[T, N any](notifier core.Stream[N]) core.Transformer[T, T] {
 // SkipUntil creates a Transformer that skips values until the notifier stream emits.
 // After the notifier emits, all subsequent values from the source are passed through.
 func SkipUntil[T, N any](notifier core.Stream[N]) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -212,8 +212,8 @@ func ElementAt[T any](index int) core.Transformer[T, T] {
 	if index < 0 {
 		panic("ElementAt: index cannot be negative")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -251,8 +251,8 @@ func ElementAtOrDefault[T any](index int, defaultValue T) core.Transformer[T, T]
 	if index < 0 {
 		panic("ElementAtOrDefault: index cannot be negative")
 	}
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -293,12 +293,13 @@ func ElementAtOrDefault[T any](index int, defaultValue T) core.Transformer[T, T]
 // If zero or more than one element matches, an error is emitted.
 // If predicate is nil, expects exactly one element in the stream.
 func Single[T any](predicate func(T) bool) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
-			var match *core.Result[T]
+			var match core.Result[T]
+			var hasMatch bool
 			matchCount := 0
 
 			for res := range in {
@@ -317,6 +318,7 @@ func Single[T any](predicate func(T) bool) core.Transformer[T, T] {
 					matchCount++
 					if matchCount == 1 {
 						match = res
+						hasMatch = true
 					} else if matchCount == 2 {
 						// More than one match
 						select {
@@ -333,7 +335,7 @@ func Single[T any](predicate func(T) bool) core.Transformer[T, T] {
 				case <-ctx.Done():
 				case out <- core.Err[T](errNoMatch):
 				}
-			} else if matchCount == 1 && match != nil {
+			} else if matchCount == 1 && hasMatch {
 				select {
 				case <-ctx.Done():
 				case out <- match:
@@ -347,12 +349,13 @@ func Single[T any](predicate func(T) bool) core.Transformer[T, T] {
 // SingleOrDefault creates a Transformer that emits the single element matching the predicate,
 // or the default value if no elements match. Errors if more than one element matches.
 func SingleOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
-			var match *core.Result[T]
+			var match core.Result[T]
+			var hasMatch bool
 			matchCount := 0
 
 			for res := range in {
@@ -371,6 +374,7 @@ func SingleOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transfo
 					matchCount++
 					if matchCount == 1 {
 						match = res
+						hasMatch = true
 					} else if matchCount == 2 {
 						select {
 						case <-ctx.Done():
@@ -386,7 +390,7 @@ func SingleOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transfo
 				case <-ctx.Done():
 				case out <- core.Ok(defaultValue):
 				}
-			} else if matchCount == 1 && match != nil {
+			} else if matchCount == 1 && hasMatch {
 				select {
 				case <-ctx.Done():
 				case out <- match:
@@ -401,8 +405,8 @@ func SingleOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transfo
 // or the default value if no elements match.
 // If predicate is nil, returns the first element or default.
 func FirstOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -440,12 +444,13 @@ func FirstOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transfor
 // or the default value if no elements match.
 // If predicate is nil, returns the last element or default.
 func LastOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
-			var lastMatch *core.Result[T]
+			var lastMatch core.Result[T]
+			var hasLastMatch bool
 			for res := range in {
 				if res.IsError() {
 					select {
@@ -460,10 +465,11 @@ func LastOrDefault[T any](predicate func(T) bool, defaultValue T) core.Transform
 				}
 				if predicate == nil || predicate(res.Value()) {
 					lastMatch = res
+					hasLastMatch = true
 				}
 			}
 
-			if lastMatch != nil {
+			if hasLastMatch {
 				select {
 				case <-ctx.Done():
 				case out <- lastMatch:

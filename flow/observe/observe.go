@@ -37,8 +37,8 @@ type StreamMetrics struct {
 // Meter creates a Transformer that collects metrics about the stream.
 // The onComplete callback is called with the final metrics when the stream completes.
 func Meter[T any](onComplete func(StreamMetrics)) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -173,8 +173,8 @@ func (m *LiveMetrics) ItemsPerSecond() float64 {
 // MeterLive creates a Transformer that updates live metrics that can be
 // read concurrently while the stream is running.
 func MeterLive[T any](metrics *LiveMetrics) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -225,8 +225,8 @@ type ProgressReport struct {
 // If total is known, pass it; otherwise pass -1.
 // The onProgress callback is called periodically or on each item based on interval.
 func Progress[T any](total int64, interval time.Duration, onProgress func(ProgressReport)) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -292,9 +292,9 @@ func Progress[T any](total int64, interval time.Duration, onProgress func(Progre
 
 // Spy creates a Transformer that allows inspection of all items without modification.
 // Unlike Tap (which only sees values), Spy sees the full Result including errors.
-func Spy[T any](inspector func(*core.Result[T])) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+func Spy[T any](inspector func(core.Result[T])) core.Transformer[T, T] {
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -347,8 +347,8 @@ type DebugInfo[T any] struct {
 // Debug creates a Transformer that provides detailed debugging information
 // for each event in the stream's lifecycle.
 func Debug[T any](handler func(DebugInfo[T])) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -469,8 +469,8 @@ func (r *RateMeter) TotalCount() int64 {
 
 // MeterRate creates a Transformer that tracks the rate of items using a RateMeter.
 func MeterRate[T any](meter *RateMeter) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 
@@ -548,8 +548,8 @@ func (h *Histogram[T]) Counts() map[T]int64 {
 
 // MeterHistogram creates a Transformer that tracks value distribution.
 func MeterHistogram[T comparable](histogram *Histogram[T]) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
 

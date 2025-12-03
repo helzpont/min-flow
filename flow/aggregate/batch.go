@@ -16,8 +16,8 @@ func Batch[T any](size int) core.Transformer[T, []T] {
 		panic("Batch size must be > 0")
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[[]T] {
-		out := make(chan *core.Result[[]T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
 			batch := make([]T, 0, size)
@@ -81,8 +81,8 @@ func BatchTimeout[T any](size int, timeout time.Duration) core.Transformer[T, []
 		panic("BatchTimeout size must be > 0")
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[[]T] {
-		out := make(chan *core.Result[[]T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
 			batch := make([]T, 0, size)
@@ -169,8 +169,8 @@ func Window[T any](size, step int) core.Transformer[T, []T] {
 		panic("Window step must be > 0")
 	}
 
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[[]T] {
-		out := make(chan *core.Result[[]T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
 			window := make([]T, 0, size)
@@ -234,8 +234,8 @@ func Window[T any](size, step int) core.Transformer[T, []T] {
 // Both partitions are collected and emitted as a single pair when the stream completes.
 // This is a collecting operation - it waits for the entire stream.
 func Partition[T any](predicate func(T) bool) core.Transformer[T, [2][]T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[[2][]T] {
-		out := make(chan *core.Result[[2][]T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[2][]T] {
+		out := make(chan core.Result[[2][]T])
 		go func() {
 			defer close(out)
 			var trueItems, falseItems []T
@@ -281,8 +281,8 @@ func Partition[T any](predicate func(T) bool) core.Transformer[T, [2][]T] {
 // The result is a map from keys to slices of items.
 // This is a collecting operation - it waits for the entire stream.
 func GroupBy[T any, K comparable](keyFn func(T) K) core.Transformer[T, map[K][]T] {
-	return core.Transmit(func(ctx context.Context, in <-chan *core.Result[T]) <-chan *core.Result[map[K][]T] {
-		out := make(chan *core.Result[map[K][]T])
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[map[K][]T] {
+		out := make(chan core.Result[map[K][]T])
 		go func() {
 			defer close(out)
 			groups := make(map[K][]T)

@@ -12,8 +12,8 @@ import (
 // Items are emitted as they arrive from any source (interleaved).
 // The output stream closes when all input streams are exhausted.
 func Merge[T any](streams ...core.Stream[T]) core.Stream[T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -49,8 +49,8 @@ func Merge[T any](streams ...core.Stream[T]) core.Stream[T] {
 // Items from the second stream only start emitting after the first completes, etc.
 // The output stream closes when all input streams are exhausted.
 func Concat[T any](streams ...core.Stream[T]) core.Stream[T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -90,8 +90,8 @@ func Zip[A, B any](streamA core.Stream[A], streamB core.Stream[B]) core.Stream[s
 // ZipWith combines items from two streams using a combiner function.
 // Emits combined results until either stream is exhausted.
 func ZipWith[A, B, C any](streamA core.Stream[A], streamB core.Stream[B], combiner func(A, B) C) core.Stream[C] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[C] {
-		out := make(chan *core.Result[C])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[C] {
+		out := make(chan core.Result[C])
 
 		go func() {
 			defer close(out)
@@ -159,13 +159,13 @@ func ZipLongest[A, B any](streamA core.Stream[A], streamB core.Stream[B]) core.S
 	HasA bool
 	HasB bool
 }] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[struct {
+	return core.Emit(func(ctx context.Context) <-chan core.Result[struct {
 		A    A
 		B    B
 		HasA bool
 		HasB bool
 	}] {
-		out := make(chan *core.Result[struct {
+		out := make(chan core.Result[struct {
 			A    A
 			B    B
 			HasA bool
@@ -253,8 +253,8 @@ func ZipLongest[A, B any](streamA core.Stream[A], streamB core.Stream[B]) core.S
 // Interleave alternates items from multiple streams in round-robin fashion.
 // Continues until all streams are exhausted.
 func Interleave[T any](streams ...core.Stream[T]) core.Stream[T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -263,7 +263,7 @@ func Interleave[T any](streams ...core.Stream[T]) core.Stream[T] {
 				return
 			}
 
-			channels := make([]<-chan *core.Result[T], len(streams))
+			channels := make([]<-chan core.Result[T], len(streams))
 			for i, s := range streams {
 				channels[i] = s.Emit(ctx)
 			}
@@ -308,8 +308,8 @@ func Interleave[T any](streams ...core.Stream[T]) core.Stream[T] {
 // whenever any stream emits a new value. Only starts emitting after all
 // streams have emitted at least one value.
 func CombineLatest[T any](streams ...core.Stream[T]) core.Stream[[]T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[[]T] {
-		out := make(chan *core.Result[[]T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[[]T] {
+		out := make(chan core.Result[[]T])
 
 		go func() {
 			defer close(out)
@@ -394,11 +394,11 @@ func WithLatestFrom[T, U any](source core.Stream[T], other core.Stream[U]) core.
 	Source T
 	Other  U
 }] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[struct {
+	return core.Emit(func(ctx context.Context) <-chan core.Result[struct {
 		Source T
 		Other  U
 	}] {
-		out := make(chan *core.Result[struct {
+		out := make(chan core.Result[struct {
 			Source T
 			Other  U
 		}])
@@ -467,8 +467,8 @@ func WithLatestFrom[T, U any](source core.Stream[T], other core.Stream[U]) core.
 // Race returns a stream that emits from whichever input stream emits first,
 // then cancels the other streams.
 func Race[T any](streams ...core.Stream[T]) core.Stream[T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -481,7 +481,7 @@ func Race[T any](streams ...core.Stream[T]) core.Stream[T] {
 
 			// Create cancellation contexts for each stream
 			cancels := make([]context.CancelFunc, n)
-			channels := make([]<-chan *core.Result[T], n)
+			channels := make([]<-chan core.Result[T], n)
 
 			for i, stream := range streams {
 				streamCtx, cancel := context.WithCancel(ctx)
@@ -491,7 +491,7 @@ func Race[T any](streams ...core.Stream[T]) core.Stream[T] {
 
 			// Wait for any stream to emit first
 			winnerIdx := -1
-			var winnerCh <-chan *core.Result[T]
+			var winnerCh <-chan core.Result[T]
 
 			// Use reflect.Select to wait on all channels
 			cases := make([]reflect.SelectCase, n+1)
@@ -526,7 +526,7 @@ func Race[T any](streams ...core.Stream[T]) core.Stream[T] {
 			}
 
 			// Emit the first result
-			result := recv.Interface().(*core.Result[T])
+			result := recv.Interface().(core.Result[T])
 			select {
 			case <-ctx.Done():
 				cancels[winnerIdx]()
@@ -560,8 +560,8 @@ func Amb[T any](streams ...core.Stream[T]) core.Stream[T] {
 // Each time the notifier emits, the most recent value from source is emitted.
 // Note: This is different from Sample operator which samples by time.
 func SampleOn[T, N any](source core.Stream[T], notifier core.Stream[N]) core.Stream[T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -612,8 +612,8 @@ func SampleOn[T, N any](source core.Stream[T], notifier core.Stream[N]) core.Str
 // Each time the notifier emits, a batch of collected items is emitted.
 // Note: This is different from Buffer operator which buffers by count.
 func BufferWith[T, N any](source core.Stream[T], notifier core.Stream[N]) core.Stream[[]T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[[]T] {
-		out := make(chan *core.Result[[]T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[[]T] {
+		out := make(chan core.Result[[]T])
 
 		go func() {
 			defer close(out)
@@ -700,8 +700,8 @@ func Gather[IN, OUT any](stream core.Stream[IN], transformers ...core.Transforme
 // Switch switches between streams based on a selector stream.
 // When the selector emits, the corresponding indexed stream becomes active.
 func Switch[T any](selector core.Stream[int], streams ...core.Stream[T]) core.Stream[T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)
@@ -710,7 +710,7 @@ func Switch[T any](selector core.Stream[int], streams ...core.Stream[T]) core.St
 				return
 			}
 
-			var activeCh <-chan *core.Result[T]
+			var activeCh <-chan core.Result[T]
 			var activeCancel context.CancelFunc
 			var mu sync.Mutex
 
@@ -778,8 +778,8 @@ func Switch[T any](selector core.Stream[int], streams ...core.Stream[T]) core.St
 
 // SequenceEqual compares two streams for equality and returns a single boolean result.
 func SequenceEqualStream[T comparable](streamA, streamB core.Stream[T]) core.Stream[bool] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[bool] {
-		out := make(chan *core.Result[bool])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[bool] {
+		out := make(chan core.Result[bool])
 
 		go func() {
 			defer close(out)
@@ -835,8 +835,8 @@ func SequenceEqualStream[T comparable](streamA, streamB core.Stream[T]) core.Str
 
 // IfEmpty returns a stream that switches to an alternative if the source is empty.
 func IfEmpty[T any](source core.Stream[T], alternative core.Stream[T]) core.Stream[T] {
-	return core.Emit(func(ctx context.Context) <-chan *core.Result[T] {
-		out := make(chan *core.Result[T])
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
+		out := make(chan core.Result[T])
 
 		go func() {
 			defer close(out)

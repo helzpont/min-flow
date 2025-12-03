@@ -52,8 +52,8 @@ func TestDoOnNext(t *testing.T) {
 func TestDoOnError(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -109,8 +109,8 @@ func TestDoOnCompleteWithCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 100; i++ {
@@ -154,8 +154,8 @@ func TestDoOnCompleteWithCancellation(t *testing.T) {
 func TestDoOnEach(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -167,7 +167,7 @@ func TestDoOnEach(t *testing.T) {
 	stream := emitter
 
 	var valueCount, errorCount, sentinelCount int
-	handler := func(r *core.Result[int]) {
+	handler := func(r core.Result[int]) {
 		switch {
 		case r.IsValue():
 			valueCount++
@@ -198,8 +198,8 @@ func TestDoOnEach(t *testing.T) {
 func TestTap(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -316,8 +316,8 @@ func TestDoOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; ; i++ {
@@ -368,8 +368,8 @@ func TestDoOnCancel(t *testing.T) {
 func TestCountValues(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -401,8 +401,8 @@ func TestCountValues(t *testing.T) {
 func TestCountAll(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -471,8 +471,8 @@ func TestLog(t *testing.T) {
 func TestTrace(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -484,7 +484,7 @@ func TestTrace(t *testing.T) {
 	stream := emitter
 
 	var events []observe.TraceEvent
-	tracer := func(event observe.TraceEvent, _ *core.Result[int]) {
+	tracer := func(event observe.TraceEvent, _ core.Result[int]) {
 		events = append(events, event)
 	}
 
@@ -515,8 +515,8 @@ func TestTraceWithCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 100; i++ {
@@ -532,7 +532,7 @@ func TestTraceWithCancellation(t *testing.T) {
 	stream := emitter
 
 	cancelEventCh := make(chan struct{})
-	tracer := func(event observe.TraceEvent, _ *core.Result[int]) {
+	tracer := func(event observe.TraceEvent, _ core.Result[int]) {
 		if event == observe.TraceCancel {
 			close(cancelEventCh)
 		}
@@ -562,8 +562,8 @@ func TestTraceWithCancellation(t *testing.T) {
 func TestMaterializeNotification(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			out <- core.Ok(1)
@@ -605,8 +605,8 @@ func TestMaterializeNotification(t *testing.T) {
 func TestDematerializeNotification(t *testing.T) {
 	ctx := context.Background()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[observe.Notification[int]] {
-		out := make(chan *core.Result[observe.Notification[int]])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[observe.Notification[int]] {
+		out := make(chan core.Result[observe.Notification[int]])
 		go func() {
 			defer close(out)
 			out <- core.Ok(observe.Notification[int]{Kind: observe.NotificationValue, Value: 1})
@@ -642,8 +642,8 @@ func TestLifecycleContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emitter := core.Emit(func(ctx context.Context) <-chan *core.Result[int] {
-		out := make(chan *core.Result[int])
+	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
+		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 100; i++ {

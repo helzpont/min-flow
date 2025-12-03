@@ -14,8 +14,8 @@ func TestSampleWith(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a sampler stream that emits periodically
-	sampler := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	sampler := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 3; i++ {
@@ -31,8 +31,8 @@ func TestSampleWith(t *testing.T) {
 	})
 
 	// Create source that emits faster than sampler
-	source := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	source := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 1; i <= 10; i++ {
@@ -64,8 +64,8 @@ func TestSampleWithPreservesErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	sampler := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	sampler := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; i < 3; i++ {
@@ -80,8 +80,8 @@ func TestSampleWithPreservesErrors(t *testing.T) {
 		return out
 	})
 
-	source := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	source := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			out <- flow.Ok(1)
@@ -272,8 +272,8 @@ func TestDistinctUntilChangedWithErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			out <- flow.Ok(1)
@@ -490,8 +490,8 @@ func TestEveryNthWithErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 1; i <= 6; i++ {
@@ -529,8 +529,8 @@ func TestEveryNthWithErrors(t *testing.T) {
 func TestSampleWithContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	sampler := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	sampler := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for {
@@ -545,8 +545,8 @@ func TestSampleWithContextCancellation(t *testing.T) {
 		return out
 	})
 
-	source := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	source := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 0; ; i++ {
@@ -590,8 +590,8 @@ func TestReservoirSampleWithErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 1; i <= 10; i++ {
@@ -628,8 +628,8 @@ func TestThrottleLastWithErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			out <- flow.Ok(1)
@@ -665,8 +665,8 @@ func TestAuditTimeWithErrors(t *testing.T) {
 
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for i := 1; i <= 10; i++ {

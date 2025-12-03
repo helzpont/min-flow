@@ -273,8 +273,8 @@ func TestTransmitter(t *testing.T) {
 
 	// Create a Transmitter that doubles values
 	// Transmitter implements Transformer directly
-	transmitter := flow.Transmit(func(ctx context.Context, in <-chan *flow.Result[int]) <-chan *flow.Result[int] {
-		out := make(chan *flow.Result[int])
+	transmitter := flow.Transmit(func(ctx context.Context, in <-chan flow.Result[int]) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			for res := range in {
