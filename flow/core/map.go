@@ -30,9 +30,14 @@ func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) Mapper[IN, OUT] {
 	}
 }
 
+// DefaultBufferSize is the default buffer size for internal channels.
+// A small buffer reduces goroutine synchronization overhead without
+// consuming excessive memory.
+const DefaultBufferSize = 64
+
 func (m Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
-		outChan := make(chan Result[OUT])
+		outChan := make(chan Result[OUT], DefaultBufferSize)
 		go func() {
 			defer close(outChan)
 			for resIn := range s.Emit(ctx) {
@@ -87,7 +92,7 @@ func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) FlatMapper[IN, OU
 
 func (fm FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
-		outChan := make(chan Result[OUT])
+		outChan := make(chan Result[OUT], DefaultBufferSize)
 		go func() {
 			defer close(outChan)
 			for resIn := range s.Emit(ctx) {

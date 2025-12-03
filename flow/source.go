@@ -10,9 +10,23 @@ import (
 
 // FromSlice creates a Stream that emits each element from the given slice.
 // The stream completes after all elements have been emitted.
+// Uses buffered channels to reduce goroutine synchronization overhead.
 func FromSlice[T any](items []T) Stream[T] {
+	const maxBufferSize = 512
+
 	return Emitter[T](func(ctx context.Context) <-chan Result[T] {
-		out := make(chan Result[T])
+		// For small slices, use a fully-buffered channel (no goroutine needed)
+		if len(items) <= maxBufferSize {
+			out := make(chan Result[T], len(items))
+			for _, item := range items {
+				out <- Ok(item)
+			}
+			close(out)
+			return out
+		}
+
+		// For larger slices, use a buffered channel with a goroutine
+		out := make(chan Result[T], maxBufferSize)
 		go func() {
 			defer close(out)
 			for _, item := range items {
