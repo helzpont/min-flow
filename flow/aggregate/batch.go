@@ -2,25 +2,104 @@ package aggregate
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
+// AggregateConfig provides configuration for aggregate transformers.
+// It can be registered as a delegate to provide default batch sizes
+// that can be overridden by function parameters.
+type AggregateConfig struct {
+	// BatchSize specifies the default batch size for batching operations.
+	// A value of 0 or negative will use the function-level default.
+	BatchSize int
+
+	// BatchTimeout specifies the default timeout for BatchTimeout operations.
+	// A value of 0 or negative will use the function-level default.
+	BatchTimeout time.Duration
+}
+
+// Init implements the core.Delegate interface.
+func (c *AggregateConfig) Init() error {
+	return nil
+}
+
+// Close implements the core.Delegate interface.
+func (c *AggregateConfig) Close() error {
+	return nil
+}
+
+// Validate implements the core.Config interface.
+// It returns an error if the configuration is invalid.
+func (c *AggregateConfig) Validate() error {
+	if c.BatchSize < 0 {
+		return fmt.Errorf("aggregate config: batch size must be >= 0, got %d", c.BatchSize)
+	}
+	if c.BatchTimeout < 0 {
+		return fmt.Errorf("aggregate config: batch timeout must be >= 0, got %v", c.BatchTimeout)
+	}
+	return nil
+}
+
+// WithBatchSize returns a functional option that sets the batch size.
+func WithBatchSize(size int) func(*AggregateConfig) {
+	return func(c *AggregateConfig) {
+		c.BatchSize = size
+	}
+}
+
+// WithBatchTimeout returns a functional option that sets the batch timeout.
+func WithBatchTimeout(timeout time.Duration) func(*AggregateConfig) {
+	return func(c *AggregateConfig) {
+		c.BatchTimeout = timeout
+	}
+}
+
+// effectiveBatchSize returns the batch size to use, considering
+// context config and the explicitly provided value.
+// If size > 0, it takes precedence. Otherwise, config from context is used.
+// Returns 0 if neither provides a valid value (caller must handle).
+func effectiveBatchSize(ctx context.Context, size int) int {
+	if size > 0 {
+		return size
+	}
+	if cfg, ok := core.GetConfig[*AggregateConfig](ctx); ok && cfg.BatchSize > 0 {
+		return cfg.BatchSize
+	}
+	return 0 // Caller must handle zero case (usually panic)
+}
+
+// effectiveBatchTimeout returns the batch timeout to use, considering
+// context config and the explicitly provided value.
+// If timeout > 0, it takes precedence. Otherwise, config from context is used.
+// Returns 0 if neither provides a valid value (caller must handle).
+func effectiveBatchTimeout(ctx context.Context, timeout time.Duration) time.Duration {
+	if timeout > 0 {
+		return timeout
+	}
+	if cfg, ok := core.GetConfig[*AggregateConfig](ctx); ok && cfg.BatchTimeout > 0 {
+		return cfg.BatchTimeout
+	}
+	return 0 // Caller must handle zero case
+}
+
 // Batch creates a Transformer that collects items into batches of the specified size.
 // When the batch is full, it is emitted as a slice. The final partial batch is emitted
 // when the stream completes.
-// If size <= 0, panics.
+// If size <= 0 and no context config provides a valid size, panics.
 func Batch[T any](size int) core.Transformer[T, []T] {
-	if size <= 0 {
-		panic("Batch size must be > 0")
-	}
-
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+		batchSize := effectiveBatchSize(ctx, size)
+		if batchSize <= 0 {
+			panic("Batch size must be > 0")
+		}
+
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
-			batch := make([]T, 0, size)
+			batch := make([]T, 0, batchSize)
 
 			emit := func() {
 				if len(batch) > 0 {
@@ -60,7 +139,7 @@ func Batch[T any](size int) core.Transformer[T, []T] {
 				}
 
 				batch = append(batch, res.Value())
-				if len(batch) >= size {
+				if len(batch) >= batchSize {
 					emit()
 				}
 			}
@@ -75,18 +154,23 @@ func Batch[T any](size int) core.Transformer[T, []T] {
 // BatchTimeout creates a Transformer that collects items into batches, emitting when
 // either the batch reaches the specified size OR the timeout elapses (whichever comes first).
 // This is useful for creating time-bounded batches in streaming scenarios.
-// If size <= 0, panics.
+// If size <= 0 and no context config provides a valid size, panics.
 func BatchTimeout[T any](size int, timeout time.Duration) core.Transformer[T, []T] {
-	if size <= 0 {
-		panic("BatchTimeout size must be > 0")
-	}
-
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+		batchSize := effectiveBatchSize(ctx, size)
+		if batchSize <= 0 {
+			panic("BatchTimeout size must be > 0")
+		}
+		batchTimeout := effectiveBatchTimeout(ctx, timeout)
+		if batchTimeout <= 0 {
+			batchTimeout = timeout // fallback to explicit parameter even if <= 0
+		}
+
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
-			batch := make([]T, 0, size)
-			timer := time.NewTimer(timeout)
+			batch := make([]T, 0, batchSize)
+			timer := time.NewTimer(batchTimeout)
 			timer.Stop()
 
 			emit := func() {
@@ -109,7 +193,7 @@ func BatchTimeout[T any](size int, timeout time.Duration) core.Transformer[T, []
 					return
 				case <-timer.C:
 					emit()
-					timer.Reset(timeout)
+					timer.Reset(batchTimeout)
 				case res, ok := <-in:
 					if !ok {
 						emit()
@@ -138,11 +222,11 @@ func BatchTimeout[T any](size int, timeout time.Duration) core.Transformer[T, []
 
 					// Start timer on first item in batch
 					if len(batch) == 0 {
-						timer.Reset(timeout)
+						timer.Reset(batchTimeout)
 					}
 
 					batch = append(batch, res.Value())
-					if len(batch) >= size {
+					if len(batch) >= batchSize {
 						emit()
 					}
 				}

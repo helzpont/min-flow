@@ -69,12 +69,22 @@ func TestBatch(t *testing.T) {
 }
 
 func TestBatchPanicsOnInvalidSize(t *testing.T) {
+	// With the delegate config pattern, panic happens at runtime when
+	// context is available, not at construction time
+	ctx := context.Background()
+	stream := flow.FromSlice([]int{1, 2, 3})
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("expected panic for size <= 0")
 		}
 	}()
-	aggregate.Batch[int](0)
+
+	// Apply creates the stream, but we need to read from it to trigger the panic
+	result := aggregate.Batch[int](0).Apply(ctx, stream)
+	// Reading from the stream triggers the transmitter function which panics
+	for range result.All(ctx) {
+	}
 }
 
 func TestBatchTimeout(t *testing.T) {
@@ -95,12 +105,22 @@ func TestBatchTimeout(t *testing.T) {
 }
 
 func TestBatchTimeoutPanicsOnInvalidSize(t *testing.T) {
+	// With the delegate config pattern, panic happens at runtime when
+	// context is available, not at construction time
+	ctx := context.Background()
+	stream := flow.FromSlice([]int{1, 2, 3})
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("expected panic for size <= 0")
 		}
 	}()
-	aggregate.BatchTimeout[int](0, time.Second)
+
+	// Apply creates the stream, but we need to read from it to trigger the panic
+	result := aggregate.BatchTimeout[int](0, time.Second).Apply(ctx, stream)
+	// Reading from the stream triggers the transmitter function which panics
+	for range result.All(ctx) {
+	}
 }
 
 func TestChunk(t *testing.T) {

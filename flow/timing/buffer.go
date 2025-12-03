@@ -2,23 +2,70 @@ package timing
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
+// TimingConfig provides configuration for timing transformers.
+// It can be registered as a delegate to provide default buffer sizes
+// that can be overridden by function parameters.
+type TimingConfig struct {
+	// BufferSize specifies the default buffer size for buffering operations.
+	// A value of 0 or negative will use the function-level default (1).
+	BufferSize int
+}
+
+// Init implements the core.Delegate interface.
+func (c *TimingConfig) Init() error {
+	return nil
+}
+
+// Close implements the core.Delegate interface.
+func (c *TimingConfig) Close() error {
+	return nil
+}
+
+// Validate implements the core.Config interface.
+// It returns an error if the configuration is invalid.
+func (c *TimingConfig) Validate() error {
+	if c.BufferSize < 0 {
+		return fmt.Errorf("timing config: buffer size must be >= 0, got %d", c.BufferSize)
+	}
+	return nil
+}
+
+// WithBufferSize returns a functional option that sets the buffer size.
+func WithBufferSize(size int) func(*TimingConfig) {
+	return func(c *TimingConfig) {
+		c.BufferSize = size
+	}
+}
+
+// effectiveBufferSize returns the buffer size to use, considering
+// context config and the explicitly provided value.
+// If size > 0, it takes precedence. Otherwise, config from context is used.
+// If neither provides a valid value, returns 1.
+func effectiveBufferSize(ctx context.Context, size int) int {
+	if size > 0 {
+		return size
+	}
+	if cfg, ok := core.GetConfig[*TimingConfig](ctx); ok && cfg.BufferSize > 0 {
+		return cfg.BufferSize
+	}
+	return 1
+}
+
 // Buffer creates a Transformer with an internal buffer of the specified size.
 // This decouples producer and consumer speeds, allowing the producer to continue
 // while the consumer processes items.
-// If size <= 0, defaults to 1.
+// If size <= 0, the buffer size is determined from context config or defaults to 1.
 func Buffer[T any](size int) core.Transformer[T, T] {
-	if size <= 0 {
-		size = 1
-	}
-
 	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
-		out := make(chan core.Result[T], size)
+		bufSize := effectiveBufferSize(ctx, size)
+		out := make(chan core.Result[T], bufSize)
 
 		go func() {
 			defer close(out)
