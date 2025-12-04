@@ -16,6 +16,7 @@ graph TB
     subgraph "Mid Level"
         Emitter["Emitter[T]"]
         Transmitter["Transmitter[IN, OUT]"]
+        Sink["Sink[IN, OUT]"]
     end
 
     subgraph "Low Level"
@@ -29,9 +30,11 @@ graph TB
 
     Stream --> Emitter
     Transformer --> Transmitter
+    Transformer --> Sink
     Emitter --> Result
     Transmitter --> Mapper
     Transmitter --> FlatMapper
+    Sink --> Result
     Mapper --> Result
     FlatMapper --> Result
 ```
@@ -170,16 +173,41 @@ ItemEmitted      // Item sent downstream
 
 ## Terminal Operations
 
-Functions that consume streams and produce final results:
+Sinks consume streams and produce final results. They mirror the Transformer pattern:
+where `Transformer.Apply(ctx, stream)` produces a Stream, `Sink.From(ctx, stream)` produces a result.
+
+### Sink[IN, OUT]
+
+A function type that implements both terminal consumption and Transformer:
 
 ```go
-// Collect all values into a slice
+// Sink type
+type Sink[IN, OUT any] func(context.Context, Stream[IN]) (OUT, error)
+
+// From: consume stream and return result (mirrors Apply)
+values, err := core.ToSlice[int]().From(ctx, stream)
+first, err := core.ToFirst[int]().From(ctx, stream)
+_, err := core.ToRun[int]().From(ctx, stream)
+
+// Apply: Sinks implement Transformer, producing single-element streams
+resultStream := core.ToSlice[int]().Apply(ctx, stream)  // Stream[[]int]
+```
+
+### Built-in Sinks
+
+| Sink           | Description                   | Output Type |
+| -------------- | ----------------------------- | ----------- |
+| `ToSlice[T]()` | Collect all values into slice | `[]T`       |
+| `ToFirst[T]()` | Return first value            | `T`         |
+| `ToRun[T]()`   | Execute for side effects      | `struct{}`  |
+
+### Free Functions (Convenience)
+
+For quick usage without creating a Sink:
+
+```go
 values, err := core.Slice(ctx, stream)
-
-// Get just the first value
 first, err := core.First(ctx, stream)
-
-// Run for side effects only
 err := core.Run(ctx, stream)
 ```
 

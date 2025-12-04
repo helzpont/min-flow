@@ -37,6 +37,21 @@ type (
 
 	// FlatMapper transforms individual items (1:N cardinality) and implements Transformer.
 	FlatMapper[IN, OUT any] = core.FlatMapper[IN, OUT]
+
+	// Sink consumes a Stream and produces a terminal result. Implements Transformer.
+	Sink[IN, OUT any] = core.Sink[IN, OUT]
+
+	Registry = core.Registry
+
+	Event = core.Event
+)
+
+const (
+	// StreamStart is the sentinel error indicating the start of a stream.
+	StreamStart Event = core.StreamStart
+
+	// StreamEnd is the sentinel error indicating the end of a stream.
+	StreamEnd Event = core.StreamEnd
 )
 
 // ErrEndOfStream is the sentinel error indicating normal stream termination.
@@ -126,6 +141,23 @@ func All[T any](ctx context.Context, stream Stream[T]) iter.Seq[Result[T]] {
 	return core.All(ctx, stream)
 }
 
+// Sink constructors.
+
+// ToSlice returns a Sink that collects all stream values into a slice.
+func ToSlice[T any]() Sink[T, []T] {
+	return core.ToSlice[T]()
+}
+
+// ToFirst returns a Sink that returns the first value from the stream.
+func ToFirst[T any]() Sink[T, T] {
+	return core.ToFirst[T]()
+}
+
+// ToRun returns a Sink that executes the stream for side effects.
+func ToRun[T any]() Sink[T, struct{}] {
+	return core.ToRun[T]()
+}
+
 // Emitter/Transmitter constructors.
 
 // Emit creates an Emitter from a channel-producing function.
@@ -136,4 +168,8 @@ func Emit[T any](emitter func(context.Context) <-chan Result[T]) Emitter[T] {
 // Transmit creates a Transmitter from a channel transformation function.
 func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) <-chan Result[OUT]) Transmitter[IN, OUT] {
 	return core.Transmit(transmitter)
+}
+
+func WithRegistry(ctx context.Context) (context.Context, *Registry) {
+	return core.WithRegistry(ctx)
 }

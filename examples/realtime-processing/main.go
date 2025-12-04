@@ -11,7 +11,6 @@ import (
 	"github.com/lguimbarda/min-flow/flow"
 	"github.com/lguimbarda/min-flow/flow/aggregate"
 	"github.com/lguimbarda/min-flow/flow/combine"
-	"github.com/lguimbarda/min-flow/flow/core"
 	"github.com/lguimbarda/min-flow/flow/filter"
 	"github.com/lguimbarda/min-flow/flow/timing"
 )
@@ -77,8 +76,8 @@ func windowingExample() {
 	defer cancel()
 
 	// Create a stream that emits values at intervals
-	values := core.Emit(func(ctx context.Context) <-chan core.Result[SensorReading] {
-		out := make(chan core.Result[SensorReading])
+	values := flow.Emit(func(ctx context.Context) <-chan flow.Result[SensorReading] {
+		out := make(chan flow.Result[SensorReading])
 		go func() {
 			defer close(out)
 			ticker := time.NewTicker(100 * time.Millisecond)
@@ -97,7 +96,7 @@ func windowingExample() {
 					select {
 					case <-ctx.Done():
 						return
-					case out <- core.Ok(reading):
+					case out <- flow.Ok(reading):
 					}
 				}
 			}
@@ -198,8 +197,8 @@ func throttlingExample() {
 	defer cancel()
 
 	// Fast producer: emits every 50ms
-	fast := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
-		out := make(chan core.Result[int])
+	fast := flow.Emit(func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
 			ticker := time.NewTicker(50 * time.Millisecond)
@@ -214,7 +213,7 @@ func throttlingExample() {
 					select {
 					case <-ctx.Done():
 						return
-					case out <- core.Ok(i):
+					case out <- flow.Ok(i):
 					}
 				}
 			}

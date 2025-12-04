@@ -115,7 +115,7 @@ func fallbackExample() {
 func circuitBreakerInterceptorExample() {
 	fmt.Println("--- Circuit Breaker Interceptor Example ---")
 
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx, registry := flow.WithRegistry(context.Background())
 
 	// Create circuit breaker that trips after 3 errors
 	var circuitTripped bool
@@ -126,16 +126,16 @@ func circuitBreakerInterceptorExample() {
 	_ = registry.Register(cb)
 
 	// Create a stream with some errors
-	errStream := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
-		ch := make(chan core.Result[int])
+	errStream := flow.Emit(func(ctx context.Context) <-chan flow.Result[int] {
+		ch := make(chan flow.Result[int])
 		go func() {
 			defer close(ch)
 			for i := 1; i <= 10; i++ {
 				// Simulate random failures
 				if rand.Float32() < 0.4 {
-					ch <- core.Err[int](fmt.Errorf("error at item %d", i))
+					ch <- flow.Err[int](fmt.Errorf("error at item %d", i))
 				} else {
-					ch <- core.Ok(i)
+					ch <- flow.Ok(i)
 				}
 			}
 		}()
@@ -163,7 +163,7 @@ func circuitBreakerInterceptorExample() {
 func errorCollectorExample() {
 	fmt.Println("--- Error Collector Example ---")
 
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx, registry := flow.WithRegistry(context.Background())
 
 	// Create collector with max 5 errors
 	collector := flowerrors.NewErrorCollectorInterceptor(
@@ -176,16 +176,16 @@ func errorCollectorExample() {
 	_ = registry.Register(counter)
 
 	// Stream with multiple errors
-	errStream := core.Emit(func(ctx context.Context) <-chan core.Result[string] {
-		ch := make(chan core.Result[string])
+	errStream := flow.Emit(func(ctx context.Context) <-chan flow.Result[string] {
+		ch := make(chan flow.Result[string])
 		go func() {
 			defer close(ch)
-			ch <- core.Ok("hello")
-			ch <- core.Err[string](errors.New("error 1: connection timeout"))
-			ch <- core.Ok("world")
-			ch <- core.Err[string](errors.New("error 2: invalid response"))
-			ch <- core.Err[string](errors.New("error 3: rate limited"))
-			ch <- core.Ok("!")
+			ch <- flow.Ok("hello")
+			ch <- flow.Err[string](errors.New("error 1: connection timeout"))
+			ch <- flow.Ok("world")
+			ch <- flow.Err[string](errors.New("error 2: invalid response"))
+			ch <- flow.Err[string](errors.New("error 3: rate limited"))
+			ch <- flow.Ok("!")
 		}()
 		return ch
 	})

@@ -358,6 +358,13 @@ make check
 make run EXAMPLE=basic
 ```
 
+## Documentation
+
+- **[Package READMEs](flow/)** - Each package has detailed documentation
+- **[Architecture Decision Records](docs/adr/)** - Key design decisions and rationale
+- **[Examples](examples/)** - Working examples for common use cases
+- **[Benchmarks](docs/BENCHMARKS.md)** - Performance analysis
+
 ## Project Status
 
 **ALPHA** - This project is under active development with no backward compatibility guarantees. Breaking changes are expected as the API evolves toward a stable release.

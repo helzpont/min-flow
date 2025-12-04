@@ -75,7 +75,7 @@ func circuitBreakerExample() {
 		fmt.Println("  [Circuit breaker OPENED]")
 	})
 
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx, registry := flow.WithRegistry(context.Background())
 	_ = registry.Register(cb)
 
 	var callCount int
@@ -146,7 +146,7 @@ func errorAggregationExample() {
 	// Create an error collector
 	collector := flowerrors.NewErrorCollectorInterceptor()
 
-	ctxWithRegistry, registry := core.WithRegistry(ctx)
+	ctxWithRegistry, registry := flow.WithRegistry(ctx)
 	_ = registry.Register(collector)
 
 	// Process some items, some of which will fail

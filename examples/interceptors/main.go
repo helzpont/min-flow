@@ -24,7 +24,7 @@ func metricsExample() {
 	fmt.Println("--- Metrics Interceptor ---")
 
 	// Create a context with registry for interceptors
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx, registry := flow.WithRegistry(context.Background())
 
 	// Create and register a metrics interceptor
 	var finalMetrics observe.StreamMetrics
@@ -60,7 +60,7 @@ func metricsExample() {
 func callbackExample() {
 	fmt.Println("--- Callback Interceptor ---")
 
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx, registry := flow.WithRegistry(context.Background())
 
 	// Create callback interceptor with handlers for different events
 	var startTime time.Time
@@ -98,7 +98,7 @@ func callbackExample() {
 func multipleInterceptorsExample() {
 	fmt.Println("--- Multiple Interceptors ---")
 
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx, registry := flow.WithRegistry(context.Background())
 
 	// Counter interceptor for basic counts
 	counter := observe.NewCounterInterceptor()
@@ -109,8 +109,8 @@ func multipleInterceptorsExample() {
 		func(format string, args ...any) {
 			fmt.Printf("  LOG: "+format+"\n", args...)
 		},
-		core.StreamStart,
-		core.StreamEnd,
+		flow.StreamStart,
+		flow.StreamEnd,
 	)
 	_ = registry.Register(logInterceptor)
 

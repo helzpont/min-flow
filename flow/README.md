@@ -111,11 +111,12 @@ var s flow.Stream[int]
 // Transformer interface
 var t flow.Transformer[int, string]
 
-// Function types
-var mapper flow.Mapper[int, int]
-var flatMapper flow.FlatMapper[int, int]
-var emitter flow.Emitter[int]
-var transmitter flow.Transmitter[int, int]
+// Function types (all implement Transformer except Emitter which implements Stream)
+var mapper flow.Mapper[int, int]           // 1:1 transformation
+var flatMapper flow.FlatMapper[int, int]   // 1:N transformation
+var emitter flow.Emitter[int]              // produces Stream
+var transmitter flow.Transmitter[int, int] // channel-level transformation
+var sink flow.Sink[int, []int]             // terminal operation
 ```
 
 ## Composition
@@ -147,7 +148,9 @@ result := flow.Apply(ctx, stream, myTransformer)
 
 ## Terminal Operations
 
-Consume streams and produce final results:
+Consume streams and produce final results. There are two styles:
+
+### Function Style (Quick & Simple)
 
 ```go
 // Collect all values into slice (stops on first error)
@@ -158,7 +161,26 @@ first, err := flow.First(ctx, stream)
 
 // Run for side effects
 err := flow.Run(ctx, stream)
+```
 
+### Sink Style (Composable & Parallel to Transformer)
+
+Sinks mirror Transformers: where `Transformer.Apply(ctx, stream)` produces a Stream,
+`Sink.From(ctx, stream)` produces a terminal result.
+
+```go
+// Same operations using Sink API
+values, err := flow.ToSlice[int]().From(ctx, stream)
+first, err := flow.ToFirst[int]().From(ctx, stream)
+_, err := flow.ToRun[int]().From(ctx, stream)
+
+// Sinks implement Transformer - use Apply to get a single-element Stream
+resultStream := flow.ToSlice[int]().Apply(ctx, stream)  // Stream[[]int]
+```
+
+### Low-Level Result Iteration
+
+```go
 // Collect all Results (including errors)
 results := flow.Collect(ctx, stream)
 
