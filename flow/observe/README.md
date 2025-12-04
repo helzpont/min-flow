@@ -4,204 +4,210 @@ The `observe` package provides operators for monitoring, debugging, and collecti
 
 ## Overview
 
-Observability is crucial for understanding stream behavior in production. These operators allow you to inspect, measure, and debug streams transparently.
+Observability is crucial for understanding stream behavior in production. This package offers two approaches:
+
+1. **Interceptor-based (Recommended)**: Register observers with a registry, and they're automatically invoked by all stream operations
+2. **Transformer-based (Deprecated)**: Explicit pipeline stages for observation
+
+The interceptor-based approach is preferred because:
+
+- No pipeline overhead - observers don't add stages to your stream
+- Global visibility - see all events across the entire pipeline
+- Simpler code - register once, observe everywhere
 
 ```mermaid
 graph LR
-    Source[Source] --> Tap[Tap/Trace]
-    Tap --> |Side Effects| Logger[Logger/Metrics]
-    Tap --> |Unchanged| Output[Output]
-
-    Source2[Source] --> Meter[Meter]
-    Meter --> |Metrics| Stats[Statistics]
-    Meter --> |Unchanged| Output2[Output]
+    subgraph "Interceptor-Based (Recommended)"
+        Registry[Registry] --> I1[OnValue]
+        Registry --> I2[OnError]
+        Registry --> I3[Metrics]
+        Source[Stream] --> Mapper[Mapper]
+        Mapper -.->|auto-invoke| Registry
+        Mapper --> Output[Output]
+    end
 ```
 
-## Operators
-
-### Side Effect Operators
+## Quick Start: Interceptor-Based Observation
 
 ```go
-// Tap: observe each item without modification
-observed := observe.Tap(func(item Order) {
-    fmt.Printf("Processing order: %s\n", item.ID)
-}).Apply(ctx, stream)
+// Set up registry and observers
+ctx, registry := core.WithRegistry(context.Background())
 
-// TapError: observe errors only
-withLogging := observe.TapError(func(err error) {
-    log.Printf("Error occurred: %v", err)
-}).Apply(ctx, stream)
+// Register observers - they'll be called automatically
+observe.OnValue(registry, func(v any) {
+    fmt.Printf("Value: %v\n", v)
+})
+observe.OnError(registry, func(err error) {
+    log.Printf("Error: %v", err)
+})
+observe.OnComplete(registry, func() {
+    fmt.Println("Stream completed")
+})
 
-// Do: comprehensive observer for all result types
-monitored := observe.Do(observe.Observer[int]{
-    OnNext:     func(v int) { fmt.Println("Value:", v) },
-    OnError:    func(e error) { log.Println("Error:", e) },
-    OnComplete: func() { fmt.Println("Done") },
-}).Apply(ctx, stream)
+// Process stream - observers fire automatically!
+result := mapper.Apply(ctx, stream)
+values, _ := core.Slice(ctx, result)
 ```
 
-### Debugging
+## Registration Functions
+
+### Basic Callbacks
 
 ```go
-// Trace: log all items with optional prefix
-traced := observe.Trace[int]("mystream").Apply(ctx, stream)
-// Output: [mystream] Value: 42
-// Output: [mystream] Error: something failed
-// Output: [mystream] Complete
+// Observe values
+observe.OnValue(registry, func(v any) {
+    fmt.Println("Got value:", v)
+})
 
-// Materialize: convert items to explicit notifications
-notifications := observe.Materialize[int]().Apply(ctx, stream)
-// Values become Notification{Kind: "N", Value: 42}
-// Errors become Notification{Kind: "E", Error: err}
-// Complete becomes Notification{Kind: "C"}
+// Observe errors
+observe.OnError(registry, func(err error) {
+    log.Error("Stream error:", err)
+})
 
-// Dematerialize: convert notifications back to items
-items := observe.Dematerialize[int]().Apply(ctx, notificationStream)
+// Observe stream lifecycle
+observe.OnStart(registry, func() {
+    fmt.Println("Stream started")
+})
+observe.OnComplete(registry, func() {
+    fmt.Println("Stream completed")
+})
 ```
 
 ### Metrics Collection
 
 ```go
-// Meter: collect comprehensive stream statistics
-metered := observe.Meter(func(m observe.StreamMetrics) {
-    fmt.Printf("Total: %d items in %v\n", m.TotalItems, m.EndTime.Sub(m.StartTime))
-    fmt.Printf("Throughput: %.2f items/sec\n", m.ItemsPerSecond)
-    fmt.Printf("Errors: %d\n", m.ErrorCount)
-}).Apply(ctx, stream)
+// Counter - counts values, errors, sentinels
+counter, _ := observe.WithCounter(registry)
+// Later: counter.Values(), counter.Errors(), counter.Total()
 
-// Count: emit count when stream completes
-counted := observe.Count[int]().Apply(ctx, stream)
+// Simple value counter
+valueCounter, _ := observe.WithValueCounter(registry)
+// Later: valueCounter.Count()
 
-// TimeInterval: add timestamps to items
-timed := observe.TimeInterval[int]().Apply(ctx, stream)
-// Emits Timed[int]{Value: 42, Interval: 100ms}
+// Error collector
+collector, _ := observe.WithErrorCollector(registry)
+// Later: collector.Errors(), collector.HasErrors()
+
+// Metrics with callback on completion
+metrics, _ := observe.WithMetrics(registry, func(m observe.StreamMetrics) {
+    fmt.Printf("Processed %d items in %v\n", m.TotalItems, m.Duration)
+})
+
+// Live metrics (query anytime)
+liveMetrics, _ := observe.WithLiveMetrics(registry)
+// Later: liveMetrics.ItemCount(), liveMetrics.ErrorCount()
 ```
 
-### StreamMetrics
-
-The `Meter` operator collects:
-
-| Metric                                     | Description           |
-| ------------------------------------------ | --------------------- |
-| `TotalItems`                               | Total items processed |
-| `ValueCount`                               | Successful values     |
-| `ErrorCount`                               | Error results         |
-| `SentinelCount`                            | Sentinel signals      |
-| `StartTime` / `EndTime`                    | Stream duration       |
-| `ItemsPerSecond`                           | Throughput            |
-| `MinLatency` / `MaxLatency` / `AvgLatency` | Time between items    |
-
-## Interceptor-Based Observation
-
-For global observability, use interceptors:
+### Logging
 
 ```go
-// Create a metrics interceptor
-type MetricsInterceptor struct {
-    itemCount atomic.Int64
-    errorCount atomic.Int64
-}
+// Log specific events
+observe.WithLogging(registry, log.Printf, core.ValueReceived, core.ErrorOccurred)
 
-func (m *MetricsInterceptor) Events() []core.Event {
-    return []core.Event{core.ValueReceived, core.ErrorOccurred}
-}
-
-func (m *MetricsInterceptor) Do(ctx context.Context, event core.Event, args ...any) error {
-    switch event {
-    case core.ValueReceived:
-        m.itemCount.Add(1)
-    case core.ErrorOccurred:
-        m.errorCount.Add(1)
-    }
-    return nil
-}
-
-// Register globally
-ctx, registry := core.WithRegistry(ctx)
-registry.Register(&MetricsInterceptor{})
-```
-
-## Lifecycle Hooks
-
-```go
-// DoOnSubscribe: called when stream starts consuming
-started := observe.DoOnSubscribe(func() {
-    log.Println("Stream started")
-}).Apply(ctx, stream)
-
-// DoOnComplete: called when stream completes normally
-completed := observe.DoOnComplete(func() {
-    log.Println("Stream completed")
-}).Apply(ctx, stream)
-
-// DoOnCancel: called when context is cancelled
-withCancel := observe.DoOnCancel(func() {
-    log.Println("Stream cancelled")
-}).Apply(ctx, stream)
-
-// DoFinally: always called (complete, error, or cancel)
-cleanup := observe.DoFinally(func() {
-    log.Println("Stream ended")
-    resources.Release()
-}).Apply(ctx, stream)
-```
-
-## Data Flow with Observation
-
-```mermaid
-sequenceDiagram
-    participant S as Source
-    participant T as Tap(log)
-    participant M as Meter
-    participant O as Output
-    participant L as Logger
-    participant Stats as Statistics
-
-    S->>T: value(1)
-    T->>L: log(1)
-    T->>M: value(1)
-    M->>Stats: count++
-    M->>O: value(1)
-
-    S->>T: value(2)
-    T->>L: log(2)
-    T->>M: value(2)
-    M->>Stats: count++
-    M->>O: value(2)
-
-    S->>T: complete
-    T->>L: complete
-    T->>M: complete
-    M->>Stats: finalize()
-    M->>O: complete
+// Log all events
+observe.WithLogging(registry, log.Printf)
 ```
 
 ## Built-in Interceptors
 
+For more control, use the interceptor types directly:
+
 ```go
+// Metrics interceptor with callback
+metrics := observe.NewMetricsInterceptor(func(m observe.StreamMetrics) {
+    fmt.Printf("Total: %d, Errors: %d, Duration: %v\n",
+        m.TotalItems, m.ErrorCount, m.Duration)
+})
+registry.Register(metrics)
+
 // Counter interceptor
 counter := observe.NewCounterInterceptor()
 registry.Register(counter)
-// Later: counter.Count() returns total items
+// Query: counter.Values(), counter.Errors(), counter.Sentinels()
 
-// Timing interceptor
-timing := observe.NewTimingInterceptor()
-registry.Register(timing)
-// Later: timing.Duration() returns stream duration
+// Callback interceptor for custom handling
+callback := observe.NewCallbackInterceptor(
+    observe.WithOnValue(func(v any) { /* handle value */ }),
+    observe.WithOnError(func(err error) { /* handle error */ }),
+    observe.WithOnStart(func() { /* handle start */ }),
+    observe.WithOnComplete(func() { /* handle complete */ }),
+)
+registry.Register(callback)
 
-// Logger interceptor
-logger := observe.NewLoggerInterceptor(log.Default(), observe.LogAll)
+// Log interceptor
+logger := observe.NewLogInterceptor(log.Printf, core.ValueReceived, core.ErrorOccurred)
 registry.Register(logger)
 ```
 
+## StreamMetrics
+
+The metrics interceptors collect:
+
+| Metric           | Description           |
+| ---------------- | --------------------- |
+| `TotalItems`     | Total items processed |
+| `ValueCount`     | Successful values     |
+| `ErrorCount`     | Error results         |
+| `SentinelCount`  | Sentinel signals      |
+| `StartTime`      | When stream started   |
+| `EndTime`        | When stream ended     |
+| `Duration`       | Total processing time |
+| `ItemsPerSecond` | Throughput            |
+
+## Data Flow with Interceptors
+
+```mermaid
+sequenceDiagram
+    participant S as Source
+    participant M as Mapper
+    participant R as Registry
+    participant O as Output
+
+    Note over R: OnValue, OnError, Metrics registered
+
+    S->>M: value(1)
+    M->>R: invoke(ValueReceived, 2)
+    R-->>R: OnValue callback
+    R-->>R: Metrics.count++
+    M->>O: value(2)
+
+    S->>M: error
+    M->>R: invoke(ErrorOccurred, err)
+    R-->>R: OnError callback
+    R-->>R: Metrics.errors++
+    M->>O: error
+
+    S->>M: complete
+    M->>R: invoke(StreamEnd)
+    R-->>R: OnComplete callback
+    M->>O: complete
+```
+
+## Deprecated Transformer-Based Operators
+
+The following operators are deprecated. Use the interceptor-based alternatives:
+
+| Deprecated                  | Use Instead                        |
+| --------------------------- | ---------------------------------- |
+| `DoOnNext[T](handler)`      | `OnValue(registry, handler)`       |
+| `DoOnError[T](handler)`     | `OnError(registry, handler)`       |
+| `DoOnComplete[T](handler)`  | `OnComplete(registry, handler)`    |
+| `DoOnSubscribe[T](handler)` | `OnStart(registry, handler)`       |
+| `Tap[T](handlers)`          | `OnValue`, `OnError`, `OnComplete` |
+| `Meter[T](callback)`        | `WithMetrics(registry, callback)`  |
+| `MeterLive[T](metrics)`     | `WithLiveMetrics(registry)`        |
+| `CountValues[T](callback)`  | `WithCounter(registry)`            |
+| `Log[T](formatter, logger)` | `WithLogging(registry, logger)`    |
+
+These deprecated operators still work but add unnecessary pipeline stages.
+
 ## When to Use
 
-| Operator       | Use Case                    |
-| -------------- | --------------------------- |
-| `Tap`          | Logging, debugging          |
-| `TapError`     | Error monitoring            |
-| `Meter`        | Production metrics          |
-| `Trace`        | Development debugging       |
-| `Materialize`  | Testing, serialization      |
-| `DoOnComplete` | Cleanup, notifications      |
-| Interceptors   | Cross-cutting observability |
+| Approach                  | Use Case                                |
+| ------------------------- | --------------------------------------- |
+| `OnValue`, `OnError`      | Simple callbacks for logging/metrics    |
+| `WithCounter`             | Counting items processed                |
+| `WithMetrics`             | Comprehensive stream statistics         |
+| `WithLogging`             | Debug logging                           |
+| Custom Interceptor        | Complex cross-cutting concerns          |
+| `MaterializeNotification` | Testing, serialization (not deprecated) |

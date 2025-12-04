@@ -33,7 +33,7 @@ func main() {
 		}
 	}
 
-	// Using OnError to handle errors
+	// Using CatchError to handle errors
 	numbers2 := flow.FromSlice([]int{1, 0, 2})
 	errCount := 0
 
@@ -44,15 +44,18 @@ func main() {
 		return n, nil
 	}).Apply(ctx, numbers2)
 
-	handled := flowerrors.OnError[int](func(err error) {
-		errCount++
-		fmt.Printf("Handled error: %v\n", err)
-	}).Apply(ctx, mapped2)
+	// CatchError handles errors matching a predicate with a handler that provides fallback values
+	handled := flowerrors.CatchError(
+		func(err error) bool { return true }, // catch all errors
+		func(err error) (int, error) {
+			errCount++
+			fmt.Printf("Handled error: %v\n", err)
+			return 0, nil // return fallback value (0) and nil to not propagate error
+		},
+	).Apply(ctx, mapped2)
 
-	// Collect values only (errors are filtered out after handling)
-	filtered := flowerrors.FilterErrors[int](func(err error) bool {
-		return false // Filter out all errors
-	}).Apply(ctx, handled)
+	// IgnoreErrors filters out any remaining errors
+	filtered := flowerrors.IgnoreErrors[int]().Apply(ctx, handled)
 	results, _ := flow.Slice(ctx, filtered)
 	fmt.Printf("Valid results: %v (errors handled: %d)\n", results, errCount)
 

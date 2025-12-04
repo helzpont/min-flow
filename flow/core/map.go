@@ -150,10 +150,14 @@ func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...Tr
 		go func() {
 			defer close(outChan)
 
+			dispatch := newInterceptorDispatch(ctx)
+			dispatch.invokeNoArg(ctx, StreamStart)
+			defer dispatch.invokeNoArg(ctx, StreamEnd)
+
 			if cfg.CheckStrategy == CheckOnCapacity {
-				m.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize)
+				m.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize, &dispatch)
 			} else {
-				m.runWithEveryItemCheck(ctx, s, outChan)
+				m.runWithEveryItemCheck(ctx, s, outChan, &dispatch)
 			}
 		}()
 		return outChan
@@ -161,40 +165,60 @@ func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...Tr
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT]) {
+func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
 	for resIn := range s.Emit(ctx) {
+		// Dispatch ItemReceived for the input
+		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
+
 		resOut, err := m(resIn)
 		if err != nil {
+			errResult := Err[OUT](err)
+			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
 			select {
 			case <-ctx.Done():
 				return
-			case outChan <- Err[OUT](err):
+			case outChan <- errResult:
+				dispatch.invokeOneArg(ctx, ItemEmitted, errResult)
 			}
 			continue
 		}
+
+		// Dispatch based on result type
+		dispatch.invokeResult(ctx, toAnyResult(resOut))
+
 		select {
 		case <-ctx.Done():
 			return
 		case outChan <- resOut:
+			dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 		}
 	}
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int) {
+func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
 
 	for resIn := range s.Emit(ctx) {
+		// Dispatch ItemReceived for the input
+		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
+
 		resOut, err := m(resIn)
 		if err != nil {
+			errResult := Err[OUT](err)
+			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
 			select {
 			case <-ctx.Done():
 				return
-			case outChan <- Err[OUT](err):
+			case outChan <- errResult:
+				dispatch.invokeOneArg(ctx, ItemEmitted, errResult)
 			}
 			itemsSinceCheck = 0
 			continue
 		}
+
+		// Dispatch based on result type
+		dispatch.invokeResult(ctx, toAnyResult(resOut))
 
 		// Check context periodically
 		if itemsSinceCheck >= bufferSize {
@@ -209,6 +233,7 @@ func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN],
 		// Try non-blocking send first
 		select {
 		case outChan <- resOut:
+			dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 			itemsSinceCheck++
 		default:
 			// Channel full - must check context before blocking
@@ -216,6 +241,7 @@ func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN],
 			case <-ctx.Done():
 				return
 			case outChan <- resOut:
+				dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 				itemsSinceCheck = 0
 			}
 		}
@@ -342,10 +368,14 @@ func (fm FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts 
 		go func() {
 			defer close(outChan)
 
+			dispatch := newInterceptorDispatch(ctx)
+			dispatch.invokeNoArg(ctx, StreamStart)
+			defer dispatch.invokeNoArg(ctx, StreamEnd)
+
 			if cfg.CheckStrategy == CheckOnCapacity {
-				fm.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize)
+				fm.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize, &dispatch)
 			} else {
-				fm.runWithEveryItemCheck(ctx, s, outChan)
+				fm.runWithEveryItemCheck(ctx, s, outChan, &dispatch)
 			}
 		}()
 		return outChan
@@ -353,44 +383,63 @@ func (fm FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts 
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT]) {
+func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
 	for resIn := range s.Emit(ctx) {
+		// Dispatch ItemReceived for the input
+		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
+
 		resOuts, err := fm(resIn)
 		if err != nil {
+			errResult := Err[OUT](err)
+			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
 			select {
 			case <-ctx.Done():
 				return
-			case outChan <- Err[OUT](err):
+			case outChan <- errResult:
+				dispatch.invokeOneArg(ctx, ItemEmitted, errResult)
 			}
 			continue
 		}
 		for _, resOut := range resOuts {
+			// Dispatch based on result type
+			dispatch.invokeResult(ctx, toAnyResult(resOut))
+
 			select {
 			case <-ctx.Done():
 				return
 			case outChan <- resOut:
+				dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 			}
 		}
 	}
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int) {
+func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
 
 	for resIn := range s.Emit(ctx) {
+		// Dispatch ItemReceived for the input
+		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
+
 		resOuts, err := fm(resIn)
 		if err != nil {
+			errResult := Err[OUT](err)
+			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
 			select {
 			case <-ctx.Done():
 				return
-			case outChan <- Err[OUT](err):
+			case outChan <- errResult:
+				dispatch.invokeOneArg(ctx, ItemEmitted, errResult)
 			}
 			itemsSinceCheck = 0
 			continue
 		}
 
 		for _, resOut := range resOuts {
+			// Dispatch based on result type
+			dispatch.invokeResult(ctx, toAnyResult(resOut))
+
 			// Check context periodically
 			if itemsSinceCheck >= bufferSize {
 				select {
@@ -404,12 +453,14 @@ func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream
 			// Try non-blocking send first
 			select {
 			case outChan <- resOut:
+				dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 				itemsSinceCheck++
 			default:
 				select {
 				case <-ctx.Done():
 					return
 				case outChan <- resOut:
+					dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 					itemsSinceCheck = 0
 				}
 			}
@@ -512,10 +563,14 @@ func (ifm IterFlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], 
 		go func() {
 			defer close(outChan)
 
+			dispatch := newInterceptorDispatch(ctx)
+			dispatch.invokeNoArg(ctx, StreamStart)
+			defer dispatch.invokeNoArg(ctx, StreamEnd)
+
 			if cfg.CheckStrategy == CheckOnCapacity {
-				ifm.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize)
+				ifm.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize, &dispatch)
 			} else {
-				ifm.runWithEveryItemCheck(ctx, s, outChan)
+				ifm.runWithEveryItemCheck(ctx, s, outChan, &dispatch)
 			}
 		}()
 		return outChan
@@ -523,15 +578,22 @@ func (ifm IterFlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], 
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (ifm IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT]) {
+func (ifm IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
 	for resIn := range s.Emit(ctx) {
+		// Dispatch ItemReceived for the input
+		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
+
 		cancelled := false
 		for resOut := range ifm(resIn) {
+			// Dispatch based on result type
+			dispatch.invokeResult(ctx, toAnyResult(resOut))
+
 			select {
 			case <-ctx.Done():
 				cancelled = true
 				return
 			case outChan <- resOut:
+				dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 			}
 		}
 		if cancelled {
@@ -541,11 +603,17 @@ func (ifm IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s 
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (ifm IterFlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int) {
+func (ifm IterFlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
 
 	for resIn := range s.Emit(ctx) {
+		// Dispatch ItemReceived for the input
+		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
+
 		for resOut := range ifm(resIn) {
+			// Dispatch based on result type
+			dispatch.invokeResult(ctx, toAnyResult(resOut))
+
 			// Check context periodically
 			if itemsSinceCheck >= bufferSize {
 				select {
@@ -559,12 +627,14 @@ func (ifm IterFlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s S
 			// Try non-blocking send first
 			select {
 			case outChan <- resOut:
+				dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 				itemsSinceCheck++
 			default:
 				select {
 				case <-ctx.Done():
 					return
 				case outChan <- resOut:
+					dispatch.invokeOneArg(ctx, ItemEmitted, resOut)
 					itemsSinceCheck = 0
 				}
 			}

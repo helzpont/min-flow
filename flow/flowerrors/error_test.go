@@ -11,59 +11,6 @@ import (
 	"github.com/lguimbarda/min-flow/flow/flowerrors"
 )
 
-func TestOnError(t *testing.T) {
-	ctx := context.Background()
-
-	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
-		out := make(chan core.Result[int])
-		go func() {
-			defer close(out)
-			out <- core.Ok(1)
-			out <- core.Err[int](errors.New("error1"))
-			out <- core.Ok(2)
-			out <- core.Err[int](errors.New("error2"))
-		}()
-		return out
-	})
-	stream := emitter
-
-	var capturedErrors []string
-	handler := func(err error) {
-		capturedErrors = append(capturedErrors, err.Error())
-	}
-
-	result := flowerrors.OnError[int](handler).Apply(ctx, stream)
-
-	// Consume the stream
-	var values []int
-	var errCount int
-	for r := range result.Emit(ctx) {
-		if r.IsValue() {
-			values = append(values, r.Value())
-		} else if r.IsError() {
-			errCount++
-		}
-	}
-
-	// Check values passed through
-	if len(values) != 2 {
-		t.Errorf("got %d values, want 2", len(values))
-	}
-
-	// Check errors passed through
-	if errCount != 2 {
-		t.Errorf("got %d errors, want 2", errCount)
-	}
-
-	// Check handler was called
-	if len(capturedErrors) != 2 {
-		t.Fatalf("got %d captured errors, want 2", len(capturedErrors))
-	}
-	if capturedErrors[0] != "error1" || capturedErrors[1] != "error2" {
-		t.Errorf("captured errors = %v, want [error1, error2]", capturedErrors)
-	}
-}
-
 func TestCatchError(t *testing.T) {
 	ctx := context.Background()
 
@@ -442,36 +389,6 @@ func TestDematerialize(t *testing.T) {
 	}
 }
 
-func TestCountErrors(t *testing.T) {
-	ctx := context.Background()
-
-	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
-		out := make(chan core.Result[int])
-		go func() {
-			defer close(out)
-			out <- core.Ok(1)
-			out <- core.Err[int](errors.New("error1"))
-			out <- core.Ok(2)
-			out <- core.Err[int](errors.New("error2"))
-			out <- core.Err[int](errors.New("error3"))
-			out <- core.Ok(3)
-		}()
-		return out
-	})
-	stream := emitter
-
-	var counter int64
-	result := flowerrors.CountErrors[int](&counter).Apply(ctx, stream)
-
-	// Consume the stream
-	for range result.Emit(ctx) {
-	}
-
-	if counter != 3 {
-		t.Errorf("got counter = %d, want 3", counter)
-	}
-}
-
 func TestThrowOnError(t *testing.T) {
 	ctx := context.Background()
 
@@ -512,49 +429,5 @@ func TestThrowOnError(t *testing.T) {
 	// Should have exactly 1 error (the stopping error)
 	if errCount != 1 {
 		t.Errorf("got %d errors, want 1", errCount)
-	}
-}
-
-func TestErrorContextCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	emitter := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
-		out := make(chan core.Result[int])
-		go func() {
-			defer close(out)
-			for i := 0; i < 100; i++ {
-				select {
-				case <-ctx.Done():
-					return
-				case out <- core.Ok(i):
-				}
-			}
-		}()
-		return out
-	})
-	stream := emitter
-
-	var handlerCalls int
-	handler := func(err error) {
-		handlerCalls++
-	}
-
-	result := flowerrors.OnError[int](handler).Apply(ctx, stream)
-
-	// Consume a few items then cancel
-	count := 0
-	for r := range result.Emit(ctx) {
-		if r.IsValue() {
-			count++
-			if count >= 5 {
-				cancel()
-			}
-		}
-	}
-
-	// Should have received around 5 items
-	if count < 3 || count > 10 {
-		t.Errorf("got %d items, expected around 5", count)
 	}
 }

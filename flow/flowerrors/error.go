@@ -6,38 +6,6 @@ import (
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
-// OnError creates a Transformer that calls a handler function when an error occurs.
-// The handler is called for side effects; the error still passes through the stream.
-func OnError[T any](handler func(error)) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
-		out := make(chan core.Result[T])
-
-		go func() {
-			defer close(out)
-
-			for res := range in {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				if res.IsError() {
-					handler(res.Error())
-				}
-
-				select {
-				case <-ctx.Done():
-					return
-				case out <- res:
-				}
-			}
-		}()
-
-		return out
-	})
-}
-
 // CatchError creates a Transformer that catches errors matching a predicate and handles them.
 // If the handler returns a value, it replaces the error. If the handler returns an error,
 // that error propagates. Non-matching errors pass through unchanged.
@@ -200,8 +168,7 @@ func ErrorsOnly[T any]() core.Transformer[T, T] {
 	})
 }
 
-// Materialize creates a Transformer that converts values to a wrapper type containing
-// either the value or the error. This is useful for processing both successes and errors uniformly.
+// Materialized wraps a value or error for uniform processing.
 type Materialized[T any] struct {
 	Value   T
 	Err     error
@@ -298,38 +265,6 @@ func Dematerialize[T any]() core.Transformer[Materialized[T], T] {
 						return
 					case out <- core.Err[T](materialized.Err):
 					}
-				}
-			}
-		}()
-
-		return out
-	})
-}
-
-// CountErrors creates a Transformer that counts errors and adds the count to a provided counter.
-// Errors still pass through the stream.
-func CountErrors[T any](counter *int64) core.Transformer[T, T] {
-	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
-		out := make(chan core.Result[T])
-
-		go func() {
-			defer close(out)
-
-			for res := range in {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				if res.IsError() {
-					*counter++
-				}
-
-				select {
-				case <-ctx.Done():
-					return
-				case out <- res:
 				}
 			}
 		}()

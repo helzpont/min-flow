@@ -4,11 +4,20 @@ The `flowerrors` package provides error handling, resilience, and recovery opera
 
 ## Overview
 
-Production systems need to handle failures gracefully. This package provides operators for catching, retrying, and recovering from errors without losing data.
+Production systems need to handle failures gracefully. This package provides:
+
+1. **Interceptor-based observers** (for monitoring): Observe errors for logging, counting, alerting
+2. **Transformer-based operators** (for recovery): Retry, fallback, catch, circuit breaker
 
 ```mermaid
 graph TB
-    subgraph "Error Flow"
+    subgraph "Error Observation (Interceptors)"
+        R[Registry] --> Counter[ErrorCounter]
+        R --> Logger[ErrorHandler]
+        R --> CB[CircuitBreaker Monitor]
+    end
+
+    subgraph "Error Recovery (Transformers)"
         Input[Items] --> Process[Process]
         Process -->|Success| Output[Output]
         Process -->|Error| Handler{Error Handler}
@@ -18,27 +27,87 @@ graph TB
     end
 ```
 
-## Error Handling Operators
-
-### Catching Errors
+## Quick Start: Error Observation
 
 ```go
-// OnError: side effect on error (logging, metrics)
-logged := flowerrors.OnError(func(err error) {
+// Set up registry and error observers
+ctx, registry := core.WithRegistry(context.Background())
+
+// Log all errors
+flowerrors.OnErrorDo(registry, func(err error) {
     log.Printf("Error: %v", err)
-}).Apply(ctx, stream)
+})
 
-// CatchError: handle specific errors
-recovered := flowerrors.CatchError(
-    func(err error) bool { return errors.Is(err, ErrNotFound) },
-    func(err error) (Item, error) { return defaultItem, nil },
-).Apply(ctx, stream)
+// Count errors
+counter, _ := flowerrors.WithErrorCounter(registry, nil)
 
-// OnErrorResumeNext: switch to fallback on error
-withFallback := flowerrors.OnErrorResumeNext(fallbackStream).Apply(ctx, stream)
+// Collect errors for later inspection
+collector, _ := flowerrors.WithErrorCollector(registry)
 
-// OnErrorReturn: replace error with value
-safe := flowerrors.OnErrorReturn(defaultValue).Apply(ctx, stream)
+// Process stream - observers fire automatically!
+result := mapper.Apply(ctx, stream)
+values, _ := core.Slice(ctx, result)
+
+fmt.Printf("Errors encountered: %d\n", counter.Count())
+for _, err := range collector.Errors() {
+    fmt.Printf("  - %v\n", err)
+}
+```
+
+## Registration Functions
+
+### Error Callbacks
+
+```go
+// Simple error handler
+flowerrors.OnErrorDo(registry, func(err error) {
+    log.Error("Stream error:", err)
+    metrics.IncrementErrors()
+})
+```
+
+### Error Counting
+
+```go
+// Count all errors
+counter, _ := flowerrors.WithErrorCounter(registry, nil)
+
+// Count specific errors
+counter, _ := flowerrors.WithErrorCounter(registry, func(err error) bool {
+    return errors.Is(err, ErrTimeout)
+})
+
+// Later: counter.Count()
+```
+
+### Error Collection
+
+```go
+// Collect all errors
+collector, _ := flowerrors.WithErrorCollector(registry)
+
+// Collect with limit
+collector, _ := flowerrors.WithErrorCollector(registry,
+    flowerrors.WithMaxErrors(100),
+)
+
+// Collect specific errors
+collector, _ := flowerrors.WithErrorCollector(registry,
+    flowerrors.WithErrorPredicate(isRetryable),
+)
+
+// Later: collector.Errors(), collector.Count(), collector.Clear()
+```
+
+### Circuit Breaker Monitor
+
+```go
+// Monitor error rates and alert when threshold hit
+cb, _ := flowerrors.WithCircuitBreakerMonitor(registry, 5, func() {
+    alert.Send("Error threshold reached!")
+})
+
+// Later: cb.IsOpen(), cb.FailureCount(), cb.Reset()
 ```
 
 ### Retry Patterns
@@ -174,24 +243,48 @@ retried := flowerrors.Retry(0, process).Apply(ctx, stream)
 For cross-cutting error handling:
 
 ```go
-interceptor := flowerrors.NewErrorInterceptor(func(err error) {
+// Simple error handler interceptor
+interceptor := flowerrors.NewErrorHandlerInterceptor(func(err error) {
     metrics.IncrementErrorCount(err)
     logger.Error("stream error", "error", err)
 })
-
-ctx, registry := core.WithRegistry(ctx)
 registry.Register(interceptor)
+
+// Error counter interceptor
+counter := flowerrors.NewErrorCounterInterceptor(nil) // nil = count all
+registry.Register(counter)
+
+// Error collector interceptor
+collector := flowerrors.NewErrorCollectorInterceptor(
+    flowerrors.WithMaxErrors(100),
+)
+registry.Register(collector)
+
+// Circuit breaker monitor interceptor
+cbMonitor := flowerrors.NewCircuitBreakerInterceptor(5, func() {
+    alert.Send("Too many errors!")
+})
+registry.Register(cbMonitor)
 ```
+
+## Deprecated Transformer-Based Observers
+
+The following operators are deprecated. Use the interceptor-based alternatives:
+
+| Deprecated                | Use Instead                       |
+| ------------------------- | --------------------------------- |
+| `OnError[T](handler)`     | `OnErrorDo(registry, handler)`    |
+| `CountErrors[T](counter)` | `WithErrorCounter(registry, nil)` |
 
 ## When to Use
 
-| Operator            | Use Case                    |
-| ------------------- | --------------------------- |
-| `OnError`           | Logging, metrics            |
-| `CatchError`        | Handle specific error types |
-| `Retry`             | Transient failures          |
-| `RetryWithBackoff`  | Rate-limited retries        |
-| `CircuitBreaker`    | Protect downstream services |
-| `Timeout`           | Bound operation time        |
-| `OnErrorReturn`     | Default values              |
-| `OnErrorResumeNext` | Fallback sources            |
+| Approach                    | Use Case                        |
+| --------------------------- | ------------------------------- |
+| `OnErrorDo`                 | Logging, alerting on errors     |
+| `WithErrorCounter`          | Counting errors for metrics     |
+| `WithErrorCollector`        | Collecting errors for reporting |
+| `WithCircuitBreakerMonitor` | Alerting on error rate spikes   |
+| `CatchError`                | Handle specific error types     |
+| `Retry`                     | Retry transient failures        |
+| `CircuitBreaker`            | Protect downstream services     |
+| `Fallback`                  | Provide default values          |

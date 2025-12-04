@@ -43,8 +43,13 @@ func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[O
 }
 
 // Intercept creates a Transmitter that invokes interceptors for each item.
-// This is a low-level primitive used to enable interceptor-based observation
-// and error handling without creating explicit transformer stages.
+// This is useful for adding explicit observation points in pipelines that
+// don't use transformers (which auto-invoke interceptors), or for observing
+// the raw output of stream sources.
+//
+// Note: Mapper, FlatMapper, and IterFlatMapper automatically invoke interceptors,
+// so Intercept is typically only needed at the start of a pipeline or between
+// non-transformer operations.
 //
 // Uses DefaultBufferSize (64) to balance throughput and backpressure.
 // For strict backpressure (unbuffered), use InterceptBuffered(0).
@@ -67,11 +72,10 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 		go func() {
 			defer close(out)
 
-			// Cache registry lookup - this is the key optimization
-			registry, hasRegistry := GetRegistry(ctx)
+			dispatch := newInterceptorDispatch(ctx)
 
-			// Early exit: if no registry, just pass through without any invoke overhead
-			if !hasRegistry {
+			// Early exit: if no interceptors, just pass through without overhead
+			if !dispatch.hasAny {
 				for res := range in {
 					select {
 					case <-ctx.Done():
@@ -80,57 +84,11 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 					}
 				}
 				return
-			}
-
-			interceptors := registry.Interceptors()
-
-			// Early exit: if no interceptors, just pass through
-			if len(interceptors) == 0 {
-				for res := range in {
-					select {
-					case <-ctx.Done():
-						return
-					case out <- res:
-					}
-				}
-				return
-			}
-
-			// Specialized invoke functions to avoid variadic allocation at call sites.
-			// The variadic `args ...any` pattern allocates a slice on EVERY call,
-			// even if the function returns early. These specialized versions eliminate that.
-
-			// invokeNoArg handles events with no arguments (StreamStart, StreamEnd)
-			invokeNoArg := func(event Event) {
-				for _, interceptor := range interceptors {
-					for _, pattern := range interceptor.Events() {
-						if event.Matches(string(pattern)) {
-							_ = interceptor.Do(ctx, event)
-							break
-						}
-					}
-				}
-			}
-
-			// invokeOneArg handles events with one argument (most item events)
-			invokeOneArg := func(event Event, arg any) {
-				for _, interceptor := range interceptors {
-					for _, pattern := range interceptor.Events() {
-						if event.Matches(string(pattern)) {
-							_ = interceptor.Do(ctx, event, arg)
-							break
-						}
-					}
-				}
 			}
 
 			// Invoke stream start interceptors
-			invokeNoArg(StreamStart)
-
-			defer func() {
-				// Invoke stream end interceptors
-				invokeNoArg(StreamEnd)
-			}()
+			dispatch.invokeNoArg(ctx, StreamStart)
+			defer dispatch.invokeNoArg(ctx, StreamEnd)
 
 			for res := range in {
 				select {
@@ -140,21 +98,14 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 				}
 
 				// Invoke item-level interceptors
-				invokeOneArg(ItemReceived, res)
-
-				if res.IsValue() {
-					invokeOneArg(ValueReceived, res.Value())
-				} else if res.IsError() {
-					invokeOneArg(ErrorOccurred, res.Error())
-				} else if res.IsSentinel() {
-					invokeOneArg(SentinelReceived, res.Error())
-				}
+				dispatch.invokeOneArg(ctx, ItemReceived, res)
+				dispatch.invokeResult(ctx, toAnyResult(res))
 
 				select {
 				case <-ctx.Done():
 					return
 				case out <- res:
-					invokeOneArg(ItemEmitted, res)
+					dispatch.invokeOneArg(ctx, ItemEmitted, res)
 				}
 			}
 		}()
