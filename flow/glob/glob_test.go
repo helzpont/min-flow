@@ -181,6 +181,7 @@ func TestWalk_NonexistentDir(t *testing.T) {
 func TestWalk_ContextCancellation(t *testing.T) {
 	dir := setupTestDir(t)
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	stream := Walk(dir)
 	count := 0
 	for res := range stream.Emit(ctx) {

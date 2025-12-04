@@ -5,6 +5,7 @@ package json
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 
 	"github.com/lguimbarda/min-flow/flow/core"
@@ -325,12 +326,11 @@ func DecodeArrayBuffered[T any](r io.Reader, bufferSize int) core.Stream[T] {
 				}
 				return
 			}
-
 			delim, ok := token.(json.Delim)
 			if !ok || delim != '[' {
 				select {
 				case <-ctx.Done():
-				case out <- core.Err[T](json.Unmarshal([]byte("expected array"), nil)):
+				case out <- core.Err[T](errors.New("expected array")):
 				}
 				return
 			}

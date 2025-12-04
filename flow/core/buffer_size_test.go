@@ -211,8 +211,8 @@ func BenchmarkBufferSize_LargeItems(b *testing.B) {
 
 	// Large item: 1KB struct
 	type largeItem struct {
-		data [1024]byte
-		id   int
+		_  [1024]byte
+		id int
 	}
 
 	for _, bufSize := range bufferSizes {

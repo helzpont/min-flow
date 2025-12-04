@@ -1175,8 +1175,12 @@ func TestIterFlatMap(t *testing.T) {
 			input: []int{1, 2, 3},
 			flatMapFn: func(x int) iter.Seq[int] {
 				return func(yield func(int) bool) {
-					yield(x)
-					yield(x)
+					if !yield(x) {
+						return
+					}
+					if !yield(x) {
+						return
+					}
 				}
 			},
 			wantValues: []int{1, 1, 2, 2, 3, 3},
@@ -1419,7 +1423,9 @@ func TestIterFlatMapper_ApplyWith(t *testing.T) {
 	ctx := context.Background()
 	duplicate := IterFlatMap(func(x int) iter.Seq[int] {
 		return func(yield func(int) bool) {
-			yield(x)
+			if !yield(x) {
+				return
+			}
 			yield(x)
 		}
 	})

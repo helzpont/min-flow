@@ -101,6 +101,7 @@ func TestReadLines_ContextCancellation(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	stream := ReadLines(tmpFile)
 
 	count := 0

@@ -434,7 +434,6 @@ func BenchmarkFlatMapperVsIterFlatMapper(b *testing.B) {
 // BenchmarkFlatMapperVsIterFlatMapper_WithStrategies tests both types with different check strategies
 func BenchmarkFlatMapperVsIterFlatMapper_WithStrategies(b *testing.B) {
 	const itemCount = 10000
-	const outputsPerItem = 3
 
 	data := make([]int, itemCount)
 	for i := range data {
@@ -460,8 +459,12 @@ func BenchmarkFlatMapperVsIterFlatMapper_WithStrategies(b *testing.B) {
 
 	ifm := IterFlatMap(func(x int) iter.Seq[int] {
 		return func(yield func(int) bool) {
-			yield(x)
-			yield(x * 2)
+			if !yield(x) {
+				return
+			}
+			if !yield(x * 2) {
+				return
+			}
 			yield(x * 3)
 		}
 	})
