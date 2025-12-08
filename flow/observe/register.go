@@ -232,17 +232,31 @@ func WithValueCounter(registry *core.Registry) (*ValueCounter, error) {
 
 // ErrorCollector collects all errors encountered in streams.
 type ErrorCollector struct {
+	mu     sync.Mutex
 	errors []error
 }
 
-// Errors returns all collected errors.
+// Errors returns a copy of all collected errors.
 func (c *ErrorCollector) Errors() []error {
-	return c.errors
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	result := make([]error, len(c.errors))
+	copy(result, c.errors)
+	return result
 }
 
 // HasErrors returns true if any errors were collected.
 func (c *ErrorCollector) HasErrors() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return len(c.errors) > 0
+}
+
+// Count returns the number of collected errors.
+func (c *ErrorCollector) Count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.errors)
 }
 
 func (c *ErrorCollector) Init() error  { return nil }
@@ -255,7 +269,9 @@ func (c *ErrorCollector) Events() []core.Event {
 func (c *ErrorCollector) Do(ctx context.Context, event core.Event, args ...any) error {
 	if len(args) > 0 {
 		if err, ok := args[0].(error); ok {
+			c.mu.Lock()
 			c.errors = append(c.errors, err)
+			c.mu.Unlock()
 		}
 	}
 	return nil

@@ -3,6 +3,7 @@ package flowerrors
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/lguimbarda/min-flow/flow/core"
@@ -49,9 +50,12 @@ func testStreamWithErrors[T any](values []T, errIndices map[int]error) core.Stre
 func TestOnErrorDo(t *testing.T) {
 	ctx, registry := core.WithRegistry(context.Background())
 
+	var mu sync.Mutex
 	var receivedErrors []error
 	err := OnErrorDo(registry, func(err error) {
+		mu.Lock()
 		receivedErrors = append(receivedErrors, err)
+		mu.Unlock()
 	})
 	if err != nil {
 		t.Fatalf("OnErrorDo registration failed: %v", err)
@@ -70,8 +74,11 @@ func TestOnErrorDo(t *testing.T) {
 	_, _ = core.Slice(ctx, output)
 
 	// Should have received 2 errors (for 2 and 4)
-	if len(receivedErrors) != 2 {
-		t.Errorf("expected 2 errors, got %d", len(receivedErrors))
+	mu.Lock()
+	errorCount := len(receivedErrors)
+	mu.Unlock()
+	if errorCount != 2 {
+		t.Errorf("expected 2 errors, got %d", errorCount)
 	}
 }
 
@@ -193,9 +200,12 @@ func TestWithErrorCollectorMaxErrors(t *testing.T) {
 func TestWithCircuitBreakerMonitor(t *testing.T) {
 	ctx, registry := core.WithRegistry(context.Background())
 
+	var mu sync.Mutex
 	var thresholdHit bool
 	cb, err := WithCircuitBreakerMonitor(registry, 2, func() {
+		mu.Lock()
 		thresholdHit = true
+		mu.Unlock()
 	})
 	if err != nil {
 		t.Fatalf("WithCircuitBreakerMonitor registration failed: %v", err)
@@ -217,15 +227,21 @@ func TestWithCircuitBreakerMonitor(t *testing.T) {
 	// Actually the CB resets on success, so it depends on the order
 	// With 1,2,3,4,5 we get: success(1), error(2), success(3), error(4), success(5)
 	// So it never reaches threshold of 2 consecutive
-	if thresholdHit {
+	mu.Lock()
+	hit := thresholdHit
+	mu.Unlock()
+	if hit {
 		t.Error("expected threshold NOT to be hit due to interleaved successes")
 	}
 
 	// Now test with consecutive errors
 	ctx2, registry2 := core.WithRegistry(context.Background())
+	var mu2 sync.Mutex
 	var threshold2Hit bool
 	cb2, _ := WithCircuitBreakerMonitor(registry2, 2, func() {
+		mu2.Lock()
 		threshold2Hit = true
+		mu2.Unlock()
 	})
 
 	// Create a mapper that produces consecutive errors
@@ -240,7 +256,10 @@ func TestWithCircuitBreakerMonitor(t *testing.T) {
 	output2 := mapper2.Apply(ctx2, input2)
 	_, _ = core.Slice(ctx2, output2)
 
-	if !threshold2Hit {
+	mu2.Lock()
+	hit2 := threshold2Hit
+	mu2.Unlock()
+	if !hit2 {
 		t.Error("expected threshold to be hit with consecutive errors")
 	}
 	if !cb2.IsOpen() {
