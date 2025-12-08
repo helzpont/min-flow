@@ -401,24 +401,30 @@ result := composed.Apply(ctx, intStream)
 This MVP provides the foundation for stream processing with interceptors. Future releases will add:
 
 ### Phase 2: Filtering & Aggregation
+
 - `flow/filter` - Filtering operators (Where, Take, Skip, First, Last, Distinct)
 - `flow/aggregate` - Aggregation operators (Reduce, Fold, Scan, Batch, Window, GroupBy)
 
 ### Phase 3: Stream Combination
+
 - `flow/combine` - Merging and combining streams (Merge, Concat, Zip, FanOut, FanIn, Race)
 
 ### Phase 4: Parallel Processing
+
 - `flow/parallel` - Concurrent processing (parallel Map, FlatMap, ForEach with worker pools)
 
 ### Phase 5: Timing & Rate Control
+
 - `flow/timing` - Timing operators (Delay, Debounce, Throttle, Timeout, Sample, RateLimit)
 
 ### Phase 6: Resilience Patterns
+
 - Retry with backoff strategies (constant, exponential, jitter)
 - Circuit breaker pattern
 - Timeout handling
 
 ### Phase 7: I/O Integrations
+
 - `flow/csv` - CSV file processing
 - `flow/json` - JSON streaming
 - `flow/http` - HTTP request/response streams
