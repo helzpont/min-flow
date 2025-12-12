@@ -149,22 +149,26 @@ func (m *LiveMetricsInterceptor) Events() []core.Event {
 func (m *LiveMetricsInterceptor) Do(ctx context.Context, event core.Event, args ...any) error {
 	switch event {
 	case core.StreamStart:
-		m.metrics.startTime.Store(time.Now().UnixNano())
+		now := time.Now()
+		m.metrics.startTime.Store(&now)
 
 	case core.ValueReceived:
 		m.metrics.totalItems.Add(1)
 		m.metrics.valueCount.Add(1)
-		m.metrics.lastItemTime.Store(time.Now().UnixNano())
+		now := time.Now()
+		m.metrics.lastItemTime.Store(&now)
 
 	case core.ErrorOccurred:
 		m.metrics.totalItems.Add(1)
 		m.metrics.errorCount.Add(1)
-		m.metrics.lastItemTime.Store(time.Now().UnixNano())
+		now := time.Now()
+		m.metrics.lastItemTime.Store(&now)
 
 	case core.SentinelReceived:
 		m.metrics.totalItems.Add(1)
 		m.metrics.sentinelCount.Add(1)
-		m.metrics.lastItemTime.Store(time.Now().UnixNano())
+		now := time.Now()
+		m.metrics.lastItemTime.Store(&now)
 	}
 
 	return nil
@@ -178,10 +182,17 @@ type LogInterceptor struct {
 
 // NewLogInterceptor creates a logging interceptor.
 // The logger function is called for each matching event.
-// If events is empty, all events are logged.
+// If events is empty, all common events are logged.
 func NewLogInterceptor(logger func(format string, args ...any), events ...core.Event) *LogInterceptor {
 	if len(events) == 0 {
-		events = []core.Event{core.AllEvents}
+		events = []core.Event{
+			core.StreamStart,
+			core.StreamEnd,
+			core.ItemReceived,
+			core.ValueReceived,
+			core.ErrorOccurred,
+			core.SentinelReceived,
+		}
 	}
 	return &LogInterceptor{
 		logger: logger,

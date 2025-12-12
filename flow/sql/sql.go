@@ -10,8 +10,8 @@ import (
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
-// DefaultBufferSize is the default buffer size for SQL operations.
-const DefaultBufferSize = 64
+// DefaultBufferSize is re-exported from core for convenience.
+const DefaultBufferSize = core.DefaultBufferSize
 
 // Scanner is a function that scans a row into a value.
 type Scanner[T any] func(*sql.Rows) (T, error)

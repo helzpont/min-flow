@@ -11,8 +11,8 @@ import (
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
-// DefaultBufferSize is the default buffer size for glob operations.
-const DefaultBufferSize = 64
+// DefaultBufferSize is re-exported from core for convenience.
+const DefaultBufferSize = core.DefaultBufferSize
 
 // FileInfo contains information about a file or directory.
 type FileInfo struct {

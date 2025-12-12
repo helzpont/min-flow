@@ -162,8 +162,8 @@ func BenchmarkInterceptor_EventMatching(b *testing.B) {
 	}{
 		{"exact_match", []Event{ItemReceived}},
 		{"multiple_exact", []Event{StreamStart, StreamEnd, ItemReceived, ValueReceived}},
-		{"wildcard_all", []Event{Event(AllEvents)}},
-		{"wildcard_prefix", []Event{Event(AllItemEvents)}},
+		{"wildcard_all", []Event{StreamStart, StreamEnd, ItemReceived}},
+		{"wildcard_prefix", []Event{ItemReceived, ItemEmitted}},
 	}
 
 	itemCount := 1000
@@ -243,7 +243,7 @@ func BenchmarkInterceptor_EventMatchingMicro(b *testing.B) {
 	})
 
 	b.Run("wildcard_all", func(b *testing.B) {
-		pattern := AllEvents
+		pattern := "*"
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			_ = event.Matches(pattern)
@@ -251,7 +251,7 @@ func BenchmarkInterceptor_EventMatchingMicro(b *testing.B) {
 	})
 
 	b.Run("wildcard_prefix", func(b *testing.B) {
-		pattern := AllItemEvents
+		pattern := "item:*"
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			_ = event.Matches(pattern)
@@ -259,7 +259,7 @@ func BenchmarkInterceptor_EventMatchingMicro(b *testing.B) {
 	})
 
 	b.Run("wildcard_suffix", func(b *testing.B) {
-		pattern := AllStartEvents
+		pattern := "*:start"
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			_ = event.Matches(pattern)

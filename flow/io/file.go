@@ -11,8 +11,8 @@ import (
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
-// DefaultBufferSize is the default buffer size for file operations.
-const DefaultBufferSize = 64
+// DefaultBufferSize is re-exported from core for convenience.
+const DefaultBufferSize = core.DefaultBufferSize
 
 // ReadLines creates a Stream that emits each line from the given file path.
 // Lines are emitted without the trailing newline character.

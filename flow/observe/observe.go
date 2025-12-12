@@ -42,8 +42,8 @@ type LiveMetrics struct {
 	valueCount    atomic.Int64
 	errorCount    atomic.Int64
 	sentinelCount atomic.Int64
-	startTime     atomic.Int64 // Unix nano
-	lastItemTime  atomic.Int64 // Unix nano
+	startTime     atomic.Pointer[time.Time]
+	lastItemTime  atomic.Pointer[time.Time]
 }
 
 // TotalItems returns the total number of items processed.
@@ -60,21 +60,27 @@ func (m *LiveMetrics) SentinelCount() int64 { return m.sentinelCount.Load() }
 
 // StartTime returns when the stream started.
 func (m *LiveMetrics) StartTime() time.Time {
-	return time.Unix(0, m.startTime.Load())
+	if t := m.startTime.Load(); t != nil {
+		return *t
+	}
+	return time.Time{}
 }
 
 // LastItemTime returns when the last item was processed.
 func (m *LiveMetrics) LastItemTime() time.Time {
-	return time.Unix(0, m.lastItemTime.Load())
+	if t := m.lastItemTime.Load(); t != nil {
+		return *t
+	}
+	return time.Time{}
 }
 
 // Duration returns how long the stream has been running.
 func (m *LiveMetrics) Duration() time.Duration {
 	start := m.startTime.Load()
-	if start == 0 {
+	if start == nil {
 		return 0
 	}
-	return time.Since(time.Unix(0, start))
+	return time.Since(*start)
 }
 
 // ItemsPerSecond returns the current throughput.

@@ -11,8 +11,8 @@ import (
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
-// DefaultBufferSize is the default buffer size for JSON operations.
-const DefaultBufferSize = 64
+// DefaultBufferSize is re-exported from core for convenience.
+const DefaultBufferSize = core.DefaultBufferSize
 
 // Decode creates a Transformer that decodes JSON strings into typed values.
 // Each input string is expected to be a valid JSON document.

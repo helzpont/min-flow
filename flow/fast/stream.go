@@ -3,10 +3,12 @@ package fast
 import (
 	"context"
 	"iter"
+
+	"github.com/lguimbarda/min-flow/flow/core"
 )
 
 // DefaultBufferSize matches core.DefaultBufferSize for fair benchmarking.
-const DefaultBufferSize = 64
+const DefaultBufferSize = core.DefaultBufferSize
 
 // Stream represents a minimal stream of values without Result wrapping.
 // Values flow directly through channels without error handling overhead.

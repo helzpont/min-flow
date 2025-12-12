@@ -40,18 +40,55 @@ const (
 	SentinelReceived Event = "sentinel:received"
 )
 
-// Event pattern wildcards for matching multiple events
-const (
-	AllEvents       = "*"
-	AllStreamEvents = "stream:*"
-	AllItemEvents   = "item:*"
-	AllStartEvents  = "*:start"
+// EventPattern defines type-safe event matching.
+type EventPattern interface {
+	Matches(Event) bool
+}
+
+// ExactMatch matches an event exactly (no wildcards).
+type ExactMatch Event
+
+func (e ExactMatch) Matches(event Event) bool {
+	return event == Event(e)
+}
+
+// AllEventsPattern matches any event.
+type AllEventsPattern struct{}
+
+func (p AllEventsPattern) Matches(Event) bool {
+	return true
+}
+
+// PrefixMatch matches events starting with a prefix (e.g., "stream:" or "item:").
+type PrefixMatch string
+
+func (p PrefixMatch) Matches(event Event) bool {
+	return strings.HasPrefix(string(event), string(p))
+}
+
+// SuffixMatch matches events ending with a suffix (e.g., ":start" or ":end").
+type SuffixMatch string
+
+func (s SuffixMatch) Matches(event Event) bool {
+	return strings.HasSuffix(string(event), string(s))
+}
+
+// Pattern constructors for backward compatibility
+var (
+	AllEvents       EventPattern = AllEventsPattern{}
+	AllStreamEvents EventPattern = PrefixMatch("stream:")
+	AllItemEvents   EventPattern = PrefixMatch("item:")
+	AllStartEvents  EventPattern = SuffixMatch(":start")
 )
 
-// Matches checks if an event matches a pattern.
+// Matches checks if an event matches a pattern string.
 // Patterns can use "*" as a wildcard prefix or suffix.
+// - "*" matches any event
+// - "item:*" matches all item events
+// - "*:start" matches all start events
+// - "item:received" matches exactly
 func (e Event) Matches(pattern string) bool {
-	if pattern == AllEvents {
+	if pattern == "*" {
 		return true
 	}
 	eventStr := string(e)
