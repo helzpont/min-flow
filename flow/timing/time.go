@@ -14,7 +14,7 @@ import (
 // ThrottleWithTrailing creates a Transformer that limits emissions to at most one per duration,
 // but also emits the last item when the throttle window closes if items were dropped.
 func ThrottleWithTrailing[T any](d time.Duration) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -104,7 +104,7 @@ func ThrottleWithTrailing[T any](d time.Duration) core.Transformer[T, T] {
 // is received within the specified duration. This extends After by allowing
 // a custom error type.
 func AfterWithError[T any](d time.Duration, timeoutErr error) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -153,8 +153,8 @@ func AfterWithError[T any](d time.Duration, timeoutErr error) core.Transformer[T
 // Interval creates an Emitter that emits sequential integers at fixed time intervals.
 // The first value (0) is emitted after the first interval.
 // The stream continues until context cancellation.
-func Interval(d time.Duration) core.Emitter[int] {
-	return core.Emitter[int](func(ctx context.Context) <-chan core.Result[int] {
+func Interval(d time.Duration) *core.Emitter[int] {
+	return core.Emit(func(ctx context.Context) <-chan core.Result[int] {
 		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
@@ -182,8 +182,8 @@ func Interval(d time.Duration) core.Emitter[int] {
 
 // Once creates an Emitter that emits a single value (0) after the specified duration,
 // then completes.
-func Once(d time.Duration) core.Emitter[int] {
-	return core.Emitter[int](func(ctx context.Context) <-chan core.Result[int] {
+func Once(d time.Duration) *core.Emitter[int] {
+	return core.Emit(func(ctx context.Context) <-chan core.Result[int] {
 		out := make(chan core.Result[int])
 		go func() {
 			defer close(out)
@@ -207,8 +207,8 @@ func Once(d time.Duration) core.Emitter[int] {
 
 // OnceWith creates an Emitter that emits the specified value after the
 // specified duration, then completes.
-func OnceWith[T any](d time.Duration, value T) core.Emitter[T] {
-	return core.Emitter[T](func(ctx context.Context) <-chan core.Result[T] {
+func OnceWith[T any](d time.Duration, value T) *core.Emitter[T] {
+	return core.Emit(func(ctx context.Context) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -238,7 +238,7 @@ type Timestamped[T any] struct {
 
 // Stamped creates a Transformer that wraps each item with the time it was received.
 func Stamped[T any]() core.Transformer[T, Timestamped[T]] {
-	return core.Transmitter[T, Timestamped[T]](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[Timestamped[T]] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[Timestamped[T]] {
 		out := make(chan core.Result[Timestamped[T]])
 		go func() {
 			defer close(out)
@@ -285,7 +285,7 @@ type TimeInterval[T any] struct {
 // Elapsed creates a Transformer that wraps each item with the duration since
 // the previous emission (or since stream start for the first item).
 func Elapsed[T any]() core.Transformer[T, TimeInterval[T]] {
-	return core.Transmitter[T, TimeInterval[T]](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[TimeInterval[T]] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[TimeInterval[T]] {
 		out := make(chan core.Result[TimeInterval[T]])
 		go func() {
 			defer close(out)
@@ -332,7 +332,7 @@ func Elapsed[T any]() core.Transformer[T, TimeInterval[T]] {
 // DelayWhen creates a Transformer that delays each item by a duration determined
 // by the provided function. This allows dynamic delay based on item value.
 func DelayWhen[T any](delayFn func(T) time.Duration) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)

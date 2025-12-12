@@ -5,40 +5,53 @@ import (
 	"iter"
 )
 
-// Emitter represents a function that produces a stream of results of type OUT.
-// It is a level of abstraction over channels, just under Stream. Emitters
-// answer the question: "How is the stream's data produced?".
-type Emitter[OUT any] func(context.Context) <-chan Result[OUT]
+// EmitFunc is the function signature for producing a stream of results.
+type EmitFunc[OUT any] func(context.Context) <-chan Result[OUT]
 
-func Emit[OUT any](emitter func(context.Context) <-chan Result[OUT]) Emitter[OUT] {
-	return emitter
+// Emitter represents a producer of stream data. It implements Stream.
+// Unlike the function-type approach, this struct-based implementation
+// is more idiomatic Go and allows for future extensibility.
+type Emitter[OUT any] struct {
+	fn EmitFunc[OUT]
 }
 
-func (e Emitter[OUT]) Emit(ctx context.Context) <-chan Result[OUT] {
-	return e(ctx)
+// Emit creates an Emitter from a channel-producing function.
+func Emit[OUT any](emitter func(context.Context) <-chan Result[OUT]) *Emitter[OUT] {
+	return &Emitter[OUT]{fn: emitter}
 }
 
-func (e Emitter[OUT]) Collect(ctx context.Context) []Result[OUT] {
+// Emit produces the channel of results. Implements Stream interface.
+func (e *Emitter[OUT]) Emit(ctx context.Context) <-chan Result[OUT] {
+	return e.fn(ctx)
+}
+
+// Collect gathers all results into a slice.
+func (e *Emitter[OUT]) Collect(ctx context.Context) []Result[OUT] {
 	return Collect(ctx, e)
 }
 
-func (e Emitter[OUT]) All(ctx context.Context) iter.Seq[Result[OUT]] {
+// All returns an iterator over all results.
+func (e *Emitter[OUT]) All(ctx context.Context) iter.Seq[Result[OUT]] {
 	return All(ctx, e)
 }
 
-// Transmitter represents a function that transforms a stream of results
-// of type IN into a stream of results of type OUT. It is a level of abstraction
-// over channels, just under Transformer. Transmitters answer the question:
-// "How is the stream's data transformed?".
-type Transmitter[IN, OUT any] func(context.Context, <-chan Result[IN]) <-chan Result[OUT]
+// TransmitFunc is the function signature for transforming a channel.
+type TransmitFunc[IN, OUT any] func(context.Context, <-chan Result[IN]) <-chan Result[OUT]
 
-func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) <-chan Result[OUT]) Transmitter[IN, OUT] {
-	return transmitter
+// Transmitter represents a channel-level transformation. It implements Transformer.
+type Transmitter[IN, OUT any] struct {
+	fn TransmitFunc[IN, OUT]
 }
 
-func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[OUT] {
+// Transmit creates a Transmitter from a channel transformation function.
+func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) <-chan Result[OUT]) *Transmitter[IN, OUT] {
+	return &Transmitter[IN, OUT]{fn: transmitter}
+}
+
+// Apply transforms a stream. Implements Transformer interface.
+func (t *Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[OUT] {
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
-		return t(ctx, in.Emit(ctx))
+		return t.fn(ctx, in.Emit(ctx))
 	})
 }
 
@@ -53,7 +66,7 @@ func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[O
 //
 // Uses DefaultBufferSize (64) to balance throughput and backpressure.
 // For strict backpressure (unbuffered), use InterceptBuffered(0).
-func Intercept[T any]() Transmitter[T, T] {
+func Intercept[T any]() *Transmitter[T, T] {
 	return InterceptBuffered[T](DefaultBufferSize)
 }
 
@@ -65,7 +78,7 @@ func Intercept[T any]() Transmitter[T, T] {
 //   - 0: Strict backpressure, highest latency
 //   - 16-64: Good balance for most use cases (Intercept uses 64 by default)
 //   - 256+: High-throughput scenarios
-func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
+func InterceptBuffered[T any](bufferSize int) *Transmitter[T, T] {
 	return Transmit(func(ctx context.Context, in <-chan Result[T]) <-chan Result[T] {
 		out := make(chan Result[T], bufferSize)
 

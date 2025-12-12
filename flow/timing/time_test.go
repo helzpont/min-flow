@@ -235,7 +235,7 @@ func TestTimestampPassesErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+	emitter := flow.Emit(func(ctx context.Context) <-chan flow.Result[int] {
 		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)
@@ -338,7 +338,7 @@ func TestDelayWhenPassesErrors(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("test error")
 
-	emitter := flow.Emitter[int](func(ctx context.Context) <-chan flow.Result[int] {
+	emitter := flow.Emit(func(ctx context.Context) <-chan flow.Result[int] {
 		out := make(chan flow.Result[int])
 		go func() {
 			defer close(out)

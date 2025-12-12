@@ -12,7 +12,7 @@ type reduceTransformer[T any] struct {
 }
 
 func (r reduceTransformer[T]) Apply(ctx context.Context, s Stream[T]) Stream[T] {
-	return Emitter[T](func(ctx context.Context) <-chan T {
+	return Emit(func(ctx context.Context) <-chan T {
 		out := make(chan T, 1)
 		go func() {
 			defer close(out)
@@ -48,7 +48,7 @@ type foldTransformer[T, R any] struct {
 }
 
 func (f foldTransformer[T, R]) Apply(ctx context.Context, s Stream[T]) Stream[R] {
-	return Emitter[R](func(ctx context.Context) <-chan R {
+	return Emit(func(ctx context.Context) <-chan R {
 		out := make(chan R, 1)
 		go func() {
 			defer close(out)
@@ -75,7 +75,7 @@ type takeTransformer[T any] struct {
 }
 
 func (t takeTransformer[T]) Apply(ctx context.Context, s Stream[T]) Stream[T] {
-	return Emitter[T](func(ctx context.Context) <-chan T {
+	return Emit(func(ctx context.Context) <-chan T {
 		out := make(chan T, DefaultBufferSize)
 		go func() {
 			defer close(out)
@@ -106,7 +106,7 @@ type skipTransformer[T any] struct {
 }
 
 func (t skipTransformer[T]) Apply(ctx context.Context, s Stream[T]) Stream[T] {
-	return Emitter[T](func(ctx context.Context) <-chan T {
+	return Emit(func(ctx context.Context) <-chan T {
 		out := make(chan T, DefaultBufferSize)
 		go func() {
 			defer close(out)
@@ -137,7 +137,7 @@ type batchTransformer[T any] struct {
 }
 
 func (b batchTransformer[T]) Apply(ctx context.Context, s Stream[T]) Stream[[]T] {
-	return Emitter[[]T](func(ctx context.Context) <-chan []T {
+	return Emit(func(ctx context.Context) <-chan []T {
 		out := make(chan []T, DefaultBufferSize)
 		go func() {
 			defer close(out)

@@ -29,10 +29,15 @@ func (e Emitter[T]) Emit(ctx context.Context) <-chan T {
 	return e(ctx)
 }
 
+// Emit creates an Emitter from a channel-producing function.
+func Emit[T any](emitter func(context.Context) <-chan T) Emitter[T] {
+	return Emitter[T](emitter)
+}
+
 // FromSlice creates a stream from a slice.
 // Unlike flow.FromSlice, values are sent directly without Result wrapping.
 func FromSlice[T any](data []T) Stream[T] {
-	return Emitter[T](func(ctx context.Context) <-chan T {
+	return Emit(func(ctx context.Context) <-chan T {
 		out := make(chan T, DefaultBufferSize)
 		go func() {
 			defer close(out)
@@ -50,7 +55,7 @@ func FromSlice[T any](data []T) Stream[T] {
 
 // FromChannel wraps an existing channel as a Stream.
 func FromChannel[T any](ch <-chan T) Stream[T] {
-	return Emitter[T](func(ctx context.Context) <-chan T {
+	return Emit(func(ctx context.Context) <-chan T {
 		out := make(chan T, DefaultBufferSize)
 		go func() {
 			defer close(out)
@@ -68,7 +73,7 @@ func FromChannel[T any](ch <-chan T) Stream[T] {
 
 // FromIter creates a stream from a Go 1.23+ iterator.
 func FromIter[T any](seq iter.Seq[T]) Stream[T] {
-	return Emitter[T](func(ctx context.Context) <-chan T {
+	return Emit(func(ctx context.Context) <-chan T {
 		out := make(chan T, DefaultBufferSize)
 		go func() {
 			defer close(out)
@@ -86,7 +91,7 @@ func FromIter[T any](seq iter.Seq[T]) Stream[T] {
 
 // Range creates a stream of integers from start to end (exclusive).
 func Range(start, end int) Stream[int] {
-	return Emitter[int](func(ctx context.Context) <-chan int {
+	return Emit(func(ctx context.Context) <-chan int {
 		out := make(chan int, DefaultBufferSize)
 		go func() {
 			defer close(out)
