@@ -171,11 +171,13 @@ func (m *Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...T
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
 func (m *Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := m.fn
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOut, err := m.fn(resIn)
+		resOut, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -203,12 +205,14 @@ func (m *Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
 func (m *Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := m.fn
 
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOut, err := m.fn(resIn)
+		resOut, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -402,11 +406,13 @@ func (fm *FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
 func (fm *FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := fm.fn
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOuts, err := fm.fn(resIn)
+		resOuts, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -435,12 +441,14 @@ func (fm *FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stre
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
 func (fm *FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := fm.fn
 
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOuts, err := fm.fn(resIn)
+		resOuts, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -603,12 +611,14 @@ func (ifm *IterFlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN],
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
 func (ifm *IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := ifm.fn
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
 		cancelled := false
-		for resOut := range ifm.fn(resIn) {
+		for resOut := range fn(resIn) {
 			// Dispatch based on result type
 			dispatch.invokeResult(ctx, toAnyResult(resOut))
 
@@ -629,12 +639,14 @@ func (ifm *IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
 func (ifm *IterFlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := ifm.fn
 
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		for resOut := range ifm.fn(resIn) {
+		for resOut := range fn(resIn) {
 			// Dispatch based on result type
 			dispatch.invokeResult(ctx, toAnyResult(resOut))
 
