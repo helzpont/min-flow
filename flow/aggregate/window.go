@@ -15,7 +15,7 @@ import (
 // Each window collects items received during the specified duration,
 // then emits them as a slice when the window closes.
 func WindowTime[T any](d time.Duration) core.Transformer[T, []T] {
-	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
@@ -92,7 +92,7 @@ func TumblingWindow[T any](d time.Duration) core.Transformer[T, []T] {
 // A session window collects items until there's a gap of the specified duration
 // with no items. When the gap is detected, the window is emitted and a new session begins.
 func SessionWindow[T any](timeout time.Duration) core.Transformer[T, []T] {
-	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
@@ -167,7 +167,7 @@ func SessionWindow[T any](timeout time.Duration) core.Transformer[T, []T] {
 // WindowWithBoundary creates a Transformer that groups items based on a boundary stream.
 // Each time the boundary stream emits, the current window is closed and emitted.
 func WindowWithBoundary[T, B any](boundary core.Stream[B]) core.Transformer[T, []T] {
-	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
@@ -238,7 +238,7 @@ func WindowWithBoundary[T, B any](boundary core.Stream[B]) core.Transformer[T, [
 // Items with the same time key (truncated to the specified duration) are grouped together.
 // The stream must be ordered by time for correct grouping.
 func GroupByTime[T any](keyFn func(T) time.Time, d time.Duration) core.Transformer[T, []T] {
-	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
@@ -307,7 +307,7 @@ func GroupByTime[T any](keyFn func(T) time.Time, d time.Duration) core.Transform
 // Windows of the specified size are emitted every hop interval.
 // If hop < size, windows overlap. If hop == size, this is equivalent to TumblingWindow.
 func HoppingWindow[T any](size, hop time.Duration) core.Transformer[T, []T] {
-	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)

@@ -110,40 +110,45 @@ func applyOptions(ctx context.Context, opts ...TransformOption) TransformConfig 
 	return cfg
 }
 
-// Mapper defines a function that maps a Result of type IN to a Result of type OUT. It represents a transformation
-// that maintains the cardinality of the flow (one input item produces one output item).
-// The mapper function is at the lowest level of abstraction in the flow processing pipeline.
-// It answers the question: "What is done to each item in the flow?"
-type Mapper[IN, OUT any] func(Result[IN]) (Result[OUT], error)
+// MapFunc is the function signature for mapping Results.
+type MapFunc[IN, OUT any] func(Result[IN]) (Result[OUT], error)
+
+// Mapper defines a transformation that maintains the cardinality of the flow
+// (one input item produces one output item).
+type Mapper[IN, OUT any] struct {
+	fn MapFunc[IN, OUT]
+}
 
 // Map creates a Mapper from a transformation function. The returned Mapper
 // uses DefaultBufferSize for its output channel. Use MapWith for custom buffer sizes.
-func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) Mapper[IN, OUT] {
-	return func(res Result[IN]) (out Result[OUT], err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = NewPanicError(r)
-			}
-		}()
+func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) *Mapper[IN, OUT] {
+	return &Mapper[IN, OUT]{
+		fn: func(res Result[IN]) (out Result[OUT], err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err = NewPanicError(r)
+				}
+			}()
 
-		if res.IsError() {
-			return Err[OUT](res.Error()), nil
-		}
-		mappedValue, err := mapFunc(res.Value())
-		if err != nil {
-			return Err[OUT](err), nil
-		}
-		return Ok(mappedValue), nil
+			if res.IsError() {
+				return Err[OUT](res.Error()), nil
+			}
+			mappedValue, err := mapFunc(res.Value())
+			if err != nil {
+				return Err[OUT](err), nil
+			}
+			return Ok(mappedValue), nil
+		},
 	}
 }
 
 // Apply transforms a stream using this Mapper with default configuration.
-func (m Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+func (m *Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
 	return m.ApplyWith(ctx, s)
 }
 
 // ApplyWith transforms a stream using this Mapper with custom options.
-func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
+func (m *Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
 	cfg := applyOptions(ctx, opts...)
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
 		outChan := make(chan Result[OUT], cfg.BufferSize)
@@ -165,12 +170,14 @@ func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...Tr
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+func (m *Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := m.fn
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOut, err := m(resIn)
+		resOut, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -196,14 +203,16 @@ func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN]
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
+func (m *Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := m.fn
 
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOut, err := m(resIn)
+		resOut, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -263,13 +272,15 @@ func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN],
 //   - Both mappers are CPU-bound (no I/O)
 //   - You don't need to observe intermediate values
 //   - Performance profiling shows channel overhead is significant
-func Fuse[IN, MID, OUT any](first Mapper[IN, MID], second Mapper[MID, OUT]) Mapper[IN, OUT] {
-	return func(res Result[IN]) (Result[OUT], error) {
-		mid, err := first(res)
-		if err != nil {
-			return Err[OUT](err), nil
-		}
-		return second(mid)
+func Fuse[IN, MID, OUT any](first *Mapper[IN, MID], second *Mapper[MID, OUT]) *Mapper[IN, OUT] {
+	return &Mapper[IN, OUT]{
+		fn: func(res Result[IN]) (Result[OUT], error) {
+			mid, err := first.fn(res)
+			if err != nil {
+				return Err[OUT](err), nil
+			}
+			return second.fn(mid)
+		},
 	}
 }
 
@@ -278,90 +289,101 @@ func Fuse[IN, MID, OUT any](first Mapper[IN, MID], second Mapper[MID, OUT]) Mapp
 type Predicate[T any] func(T) bool
 
 // ToFlatMapper converts a Mapper to a FlatMapper that produces exactly one output per input.
-func (m Mapper[IN, OUT]) ToFlatMapper() FlatMapper[IN, OUT] {
-	return func(res Result[IN]) ([]Result[OUT], error) {
-		out, err := m(res)
-		if err != nil {
-			return []Result[OUT]{Err[OUT](err)}, nil
-		}
-		return []Result[OUT]{out}, nil
+func (m *Mapper[IN, OUT]) ToFlatMapper() *FlatMapper[IN, OUT] {
+	return &FlatMapper[IN, OUT]{
+		fn: func(res Result[IN]) ([]Result[OUT], error) {
+			out, err := m.fn(res)
+			if err != nil {
+				return []Result[OUT]{Err[OUT](err)}, nil
+			}
+			return []Result[OUT]{out}, nil
+		},
 	}
 }
 
 // ToFlatMapper converts a Predicate to a FlatMapper that produces one output if the
 // predicate passes, or zero outputs if it fails.
-func (p Predicate[T]) ToFlatMapper() FlatMapper[T, T] {
-	return func(res Result[T]) ([]Result[T], error) {
-		if res.IsError() {
-			return []Result[T]{res}, nil
-		}
-		if p(res.Value()) {
-			return []Result[T]{res}, nil
-		}
-		return nil, nil // filtered out
+func (p Predicate[T]) ToFlatMapper() *FlatMapper[T, T] {
+	return &FlatMapper[T, T]{
+		fn: func(res Result[T]) ([]Result[T], error) {
+			if res.IsError() {
+				return []Result[T]{res}, nil
+			}
+			if p(res.Value()) {
+				return []Result[T]{res}, nil
+			}
+			return nil, nil // filtered out
+		},
 	}
 }
 
 // FuseFlat combines two FlatMappers into a single FlatMapper.
 // This is the universal fusion function - Mapper and Predicate can be converted
 // to FlatMapper using their ToFlatMapper() methods before fusing.
-func FuseFlat[IN, MID, OUT any](first FlatMapper[IN, MID], second FlatMapper[MID, OUT]) FlatMapper[IN, OUT] {
-	return func(res Result[IN]) ([]Result[OUT], error) {
-		mids, err := first(res)
-		if err != nil {
-			return []Result[OUT]{Err[OUT](err)}, nil
-		}
-		var outs []Result[OUT]
-		for _, mid := range mids {
-			midOuts, err := second(mid)
+func FuseFlat[IN, MID, OUT any](first *FlatMapper[IN, MID], second *FlatMapper[MID, OUT]) *FlatMapper[IN, OUT] {
+	return &FlatMapper[IN, OUT]{
+		fn: func(res Result[IN]) ([]Result[OUT], error) {
+			mids, err := first.fn(res)
 			if err != nil {
-				outs = append(outs, Err[OUT](err))
-				continue
+				return []Result[OUT]{Err[OUT](err)}, nil
 			}
-			outs = append(outs, midOuts...)
-		}
-		return outs, nil
+			var outs []Result[OUT]
+			for _, mid := range mids {
+				midOuts, err := second.fn(mid)
+				if err != nil {
+					outs = append(outs, Err[OUT](err))
+					continue
+				}
+				outs = append(outs, midOuts...)
+			}
+			return outs, nil
+		},
 	}
 }
 
-// FlatMapper defines a function that maps a Result of type IN to a Result containing a slice of Results of type OUT.
-// It represents a transformation that can change the cardinality of the flow (one input item can produce zero or more output items).
-// The flat mapper function is at the lowest level of abstraction in the flow processing pipeline.
-// It answers the question: "How are items in the flow reduced or expanded?"
-type FlatMapper[IN, OUT any] func(Result[IN]) ([]Result[OUT], error)
+// FlatMapFunc is the function signature for flat mapping Results.
+type FlatMapFunc[IN, OUT any] func(Result[IN]) ([]Result[OUT], error)
+
+// FlatMapper defines a transformation that can change the cardinality of the flow
+// (one input item can produce zero or more output items).
+type FlatMapper[IN, OUT any] struct {
+	fn FlatMapFunc[IN, OUT]
+}
 
 // FlatMap creates a FlatMapper from a transformation function. The returned FlatMapper
 // uses DefaultBufferSize for its output channel. Use ApplyWith for custom buffer sizes.
-func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) FlatMapper[IN, OUT] {
-	return func(res Result[IN]) (outs []Result[OUT], err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = NewPanicError(r)
-			}
-		}()
+func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) *FlatMapper[IN, OUT] {
+	return &FlatMapper[IN, OUT]{
+		fn: func(res Result[IN]) (outs []Result[OUT], err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err = NewPanicError(r)
+				}
+			}()
 
-		if res.IsError() {
-			return []Result[OUT]{Err[OUT](res.Error())}, nil
-		}
-		mappedValues, err := flatMapFunc(res.Value())
-		if err != nil {
-			return []Result[OUT]{Err[OUT](err)}, nil
-		}
-		results := make([]Result[OUT], len(mappedValues))
-		for i, v := range mappedValues {
-			results[i] = Ok(v)
-		}
-		return results, nil
+			if res.IsError() {
+				return []Result[OUT]{Err[OUT](res.Error())}, nil
+			}
+			mappedValues, err := flatMapFunc(res.Value())
+			if err != nil {
+				return []Result[OUT]{Err[OUT](err)}, nil
+			}
+			results := make([]Result[OUT], len(mappedValues))
+			for i, v := range mappedValues {
+				results[i] = Ok(v)
+			}
+			return results, nil
+		},
 	}
 }
 
 // Apply transforms a stream using this FlatMapper with default configuration.
-func (fm FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+func (fm *FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
 	return fm.ApplyWith(ctx, s)
 }
 
 // ApplyWith transforms a stream using this FlatMapper with custom options.
-func (fm FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
+func (fm *FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
 	cfg := applyOptions(ctx, opts...)
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
 		outChan := make(chan Result[OUT], cfg.BufferSize)
@@ -383,12 +405,14 @@ func (fm FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts 
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+func (fm *FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := fm.fn
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOuts, err := fm(resIn)
+		resOuts, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -415,14 +439,16 @@ func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Strea
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
+func (fm *FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := fm.fn
 
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		resOuts, err := fm(resIn)
+		resOuts, err := fn(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
@@ -472,91 +498,97 @@ func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream
 // Iterator-based FlatMapper
 // =============================================================================
 
-// IterFlatMapper defines a function that maps a value of type IN to an iterator
+// IterFlatMapFunc is the function signature for iterator-based flat mapping.
+type IterFlatMapFunc[IN, OUT any] func(Result[IN]) iter.Seq[Result[OUT]]
+
+// IterFlatMapper defines a transformation that maps a value of type IN to an iterator
 // of Results of type OUT. Unlike FlatMapper, it avoids intermediate slice allocation
 // by yielding results directly.
-//
-// The iterator function is at the lowest level of abstraction in the flow processing
-// pipeline. It answers the question: "How are items in the flow reduced or expanded?"
 //
 // Benefits over FlatMapper:
 //   - No intermediate slice allocation
 //   - Lazy evaluation - can short-circuit on cancellation
 //   - 4-5% faster in benchmarks
-type IterFlatMapper[IN, OUT any] func(Result[IN]) iter.Seq[Result[OUT]]
+type IterFlatMapper[IN, OUT any] struct {
+	fn IterFlatMapFunc[IN, OUT]
+}
 
 // IterFlatMap creates an IterFlatMapper from a transformation function that returns
 // an iterator. This is the most efficient way to implement one-to-many transformations.
-func IterFlatMap[IN, OUT any](flatMapFunc func(IN) iter.Seq[OUT]) IterFlatMapper[IN, OUT] {
-	return func(res Result[IN]) iter.Seq[Result[OUT]] {
-		return func(yield func(Result[OUT]) bool) {
-			if res.IsError() {
-				yield(Err[OUT](res.Error()))
-				return
-			}
+func IterFlatMap[IN, OUT any](flatMapFunc func(IN) iter.Seq[OUT]) *IterFlatMapper[IN, OUT] {
+	return &IterFlatMapper[IN, OUT]{
+		fn: func(res Result[IN]) iter.Seq[Result[OUT]] {
+			return func(yield func(Result[OUT]) bool) {
+				if res.IsError() {
+					yield(Err[OUT](res.Error()))
+					return
+				}
 
-			// Wrap the user's iterator to convert OUT to Result[OUT]
-			// and handle panics
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						yield(Err[OUT](NewPanicError(r)))
+				// Wrap the user's iterator to convert OUT to Result[OUT]
+				// and handle panics
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							yield(Err[OUT](NewPanicError(r)))
+						}
+					}()
+
+					for out := range flatMapFunc(res.Value()) {
+						if !yield(Ok(out)) {
+							return
+						}
 					}
 				}()
-
-				for out := range flatMapFunc(res.Value()) {
-					if !yield(Ok(out)) {
-						return
-					}
-				}
-			}()
-		}
+			}
+		},
 	}
 }
 
 // IterFlatMapSlice creates an IterFlatMapper from a function that returns a slice.
 // This provides the convenience of slice-based logic with the efficiency of iterators.
-func IterFlatMapSlice[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) IterFlatMapper[IN, OUT] {
-	return func(res Result[IN]) iter.Seq[Result[OUT]] {
-		return func(yield func(Result[OUT]) bool) {
-			if res.IsError() {
-				yield(Err[OUT](res.Error()))
-				return
-			}
-
-			// Handle panics from user function
-			var outs []OUT
-			var err error
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						err = NewPanicError(r)
-					}
-				}()
-				outs, err = flatMapFunc(res.Value())
-			}()
-
-			if err != nil {
-				yield(Err[OUT](err))
-				return
-			}
-
-			for _, out := range outs {
-				if !yield(Ok(out)) {
+func IterFlatMapSlice[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) *IterFlatMapper[IN, OUT] {
+	return &IterFlatMapper[IN, OUT]{
+		fn: func(res Result[IN]) iter.Seq[Result[OUT]] {
+			return func(yield func(Result[OUT]) bool) {
+				if res.IsError() {
+					yield(Err[OUT](res.Error()))
 					return
 				}
+
+				// Handle panics from user function
+				var outs []OUT
+				var err error
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							err = NewPanicError(r)
+						}
+					}()
+					outs, err = flatMapFunc(res.Value())
+				}()
+
+				if err != nil {
+					yield(Err[OUT](err))
+					return
+				}
+
+				for _, out := range outs {
+					if !yield(Ok(out)) {
+						return
+					}
+				}
 			}
-		}
+		},
 	}
 }
 
 // Apply transforms a stream using this IterFlatMapper with default configuration.
-func (ifm IterFlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+func (ifm *IterFlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
 	return ifm.ApplyWith(ctx, s)
 }
 
 // ApplyWith transforms a stream using this IterFlatMapper with custom options.
-func (ifm IterFlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
+func (ifm *IterFlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...TransformOption) Stream[OUT] {
 	cfg := applyOptions(ctx, opts...)
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
 		outChan := make(chan Result[OUT], cfg.BufferSize)
@@ -578,13 +610,15 @@ func (ifm IterFlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], 
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (ifm IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+func (ifm *IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := ifm.fn
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
 		cancelled := false
-		for resOut := range ifm(resIn) {
+		for resOut := range fn(resIn) {
 			// Dispatch based on result type
 			dispatch.invokeResult(ctx, toAnyResult(resOut))
 
@@ -603,14 +637,16 @@ func (ifm IterFlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s 
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (ifm IterFlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
+func (ifm *IterFlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
+	// Cache the function locally to avoid repeated pointer dereferencing
+	fn := ifm.fn
 
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
 
-		for resOut := range ifm(resIn) {
+		for resOut := range fn(resIn) {
 			// Dispatch based on result type
 			dispatch.invokeResult(ctx, toAnyResult(resOut))
 

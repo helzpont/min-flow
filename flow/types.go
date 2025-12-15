@@ -92,25 +92,25 @@ func NewResult[T any](value T, err error, isSentinel bool) Result[T] {
 // Mapper/FlatMapper constructors.
 
 // Map creates a Mapper from a simple transformation function.
-func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) Mapper[IN, OUT] {
+func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) *Mapper[IN, OUT] {
 	return core.Map(mapFunc)
 }
 
 // FlatMap creates a FlatMapper from a function returning a slice.
-func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) FlatMapper[IN, OUT] {
+func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) *FlatMapper[IN, OUT] {
 	return core.FlatMap(flatMapFunc)
 }
 
 // Fuse combines two Mappers into a single Mapper that applies both transformations
 // sequentially without an intermediate channel or goroutine. This is an optimization
 // for CPU-bound transformations where channel overhead matters.
-func Fuse[IN, MID, OUT any](first Mapper[IN, MID], second Mapper[MID, OUT]) Mapper[IN, OUT] {
+func Fuse[IN, MID, OUT any](first *Mapper[IN, MID], second *Mapper[MID, OUT]) *Mapper[IN, OUT] {
 	return core.Fuse(first, second)
 }
 
 // FuseFlat combines two FlatMappers into a single FlatMapper.
 // Mapper and Predicate can be converted to FlatMapper using ToFlatMapper() before fusing.
-func FuseFlat[IN, MID, OUT any](first FlatMapper[IN, MID], second FlatMapper[MID, OUT]) FlatMapper[IN, OUT] {
+func FuseFlat[IN, MID, OUT any](first *FlatMapper[IN, MID], second *FlatMapper[MID, OUT]) *FlatMapper[IN, OUT] {
 	return core.FuseFlat(first, second)
 }
 
@@ -144,29 +144,29 @@ func All[T any](ctx context.Context, stream Stream[T]) iter.Seq[Result[T]] {
 // Sink constructors.
 
 // ToSlice returns a Sink that collects all stream values into a slice.
-func ToSlice[T any]() Sink[T, []T] {
+func ToSlice[T any]() *Sink[T, []T] {
 	return core.ToSlice[T]()
 }
 
 // ToFirst returns a Sink that returns the first value from the stream.
-func ToFirst[T any]() Sink[T, T] {
+func ToFirst[T any]() *Sink[T, T] {
 	return core.ToFirst[T]()
 }
 
 // ToRun returns a Sink that executes the stream for side effects.
-func ToRun[T any]() Sink[T, struct{}] {
+func ToRun[T any]() *Sink[T, struct{}] {
 	return core.ToRun[T]()
 }
 
 // Emitter/Transmitter constructors.
 
 // Emit creates an Emitter from a channel-producing function.
-func Emit[T any](emitter func(context.Context) <-chan Result[T]) Emitter[T] {
+func Emit[T any](emitter func(context.Context) <-chan Result[T]) *Emitter[T] {
 	return core.Emit(emitter)
 }
 
 // Transmit creates a Transmitter from a channel transformation function.
-func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) <-chan Result[OUT]) Transmitter[IN, OUT] {
+func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) <-chan Result[OUT]) *Transmitter[IN, OUT] {
 	return core.Transmit(transmitter)
 }
 

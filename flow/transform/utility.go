@@ -12,7 +12,7 @@ import (
 // Pairwise creates a Transformer that emits pairs of consecutive items.
 // Each emission (except the first) includes the current and previous item.
 func Pairwise[T any]() core.Transformer[T, [2]T] {
-	return core.Transmitter[T, [2]T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[2]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[2]T] {
 		out := make(chan core.Result[[2]T])
 		go func() {
 			defer close(out)
@@ -60,7 +60,7 @@ func Pairwise[T any]() core.Transformer[T, [2]T] {
 // StartWith creates a Transformer that prepends the specified values before
 // emitting items from the source stream.
 func StartWith[T any](values ...T) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -98,7 +98,7 @@ func StartWith[T any](values ...T) core.Transformer[T, T] {
 // EndWith creates a Transformer that appends the specified values after
 // all items from the source stream have been emitted.
 func EndWith[T any](values ...T) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -135,7 +135,7 @@ func EndWith[T any](values ...T) core.Transformer[T, T] {
 // DefaultIfEmpty creates a Transformer that emits the specified default value
 // if the source stream completes without emitting any items.
 func DefaultIfEmpty[T any](defaultValue T) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -174,7 +174,7 @@ func DefaultIfEmpty[T any](defaultValue T) core.Transformer[T, T] {
 // then flattens all of these inner Streams using switch: when a new inner Stream
 // is created, the previous inner Stream is cancelled.
 func SwitchMap[IN, OUT any](project func(IN) core.Stream[OUT]) core.Transformer[IN, OUT] {
-	return core.Transmitter[IN, OUT](func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
 		out := make(chan core.Result[OUT])
 		go func() {
 			defer close(out)
@@ -274,7 +274,7 @@ func SwitchMap[IN, OUT any](project func(IN) core.Stream[OUT]) core.Transformer[
 // ExhaustMap creates a Transformer that projects each source value to a Stream,
 // but ignores new source values while the current inner Stream is still active.
 func ExhaustMap[IN, OUT any](project func(IN) core.Stream[OUT]) core.Transformer[IN, OUT] {
-	return core.Transmitter[IN, OUT](func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
 		out := make(chan core.Result[OUT])
 		go func() {
 			defer close(out)
@@ -349,7 +349,7 @@ func ExhaustMap[IN, OUT any](project func(IN) core.Stream[OUT]) core.Transformer
 // then flattens all inner Streams sequentially (waits for each to complete before
 // subscribing to the next).
 func ConcatMap[IN, OUT any](project func(IN) core.Stream[OUT]) core.Transformer[IN, OUT] {
-	return core.Transmitter[IN, OUT](func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
 		out := make(chan core.Result[OUT])
 		go func() {
 			defer close(out)
@@ -399,7 +399,7 @@ func MergeMap[IN, OUT any](project func(IN) core.Stream[OUT], concurrency int) c
 	if concurrency <= 0 {
 		concurrency = 100 // Reasonable default for "unlimited"
 	}
-	return core.Transmitter[IN, OUT](func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[IN]) <-chan core.Result[OUT] {
 		out := make(chan core.Result[OUT])
 		go func() {
 			defer close(out)
@@ -466,7 +466,7 @@ func MergeMap[IN, OUT any](project func(IN) core.Stream[OUT], concurrency int) c
 // Repeat creates a Transformer that repeats the source stream the specified
 // number of times. If count is 0 or negative, the stream is repeated indefinitely.
 func Repeat[T any](count int) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -507,7 +507,7 @@ func Repeat[T any](count int) core.Transformer[T, T] {
 // notifier function returns a Stream that emits. The stream completes when
 // the notifier completes.
 func RepeatWhen[T, N any](notifier func() core.Stream[N]) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -554,7 +554,7 @@ func RepeatWhen[T, N any](notifier func() core.Stream[N]) core.Transformer[T, T]
 // IgnoreElements creates a Transformer that ignores all emitted items,
 // only forwarding errors and completion.
 func IgnoreElements[T any]() core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -584,7 +584,7 @@ func IgnoreElements[T any]() core.Transformer[T, T] {
 // ToSlice creates a Transformer that collects all items into a single slice.
 // The slice is emitted when the source stream completes.
 func ToSlice[T any]() core.Transformer[T, []T] {
-	return core.Transmitter[T, []T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[[]T] {
 		out := make(chan core.Result[[]T])
 		go func() {
 			defer close(out)
@@ -624,7 +624,7 @@ func ToSlice[T any]() core.Transformer[T, []T] {
 // ToMap creates a Transformer that collects all items into a map using the
 // provided key function. If duplicate keys exist, later values overwrite earlier ones.
 func ToMap[T any, K comparable](keyFn func(T) K) core.Transformer[T, map[K]T] {
-	return core.Transmitter[T, map[K]T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[map[K]T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[map[K]T] {
 		out := make(chan core.Result[map[K]T])
 		go func() {
 			defer close(out)
@@ -664,7 +664,7 @@ func ToMap[T any, K comparable](keyFn func(T) K) core.Transformer[T, map[K]T] {
 // ToSet creates a Transformer that collects all unique items into a map[T]struct{}.
 // This effectively creates a set of all unique values.
 func ToSet[T comparable]() core.Transformer[T, map[T]struct{}] {
-	return core.Transmitter[T, map[T]struct{}](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[map[T]struct{}] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[map[T]struct{}] {
 		out := make(chan core.Result[map[T]struct{}])
 		go func() {
 			defer close(out)
@@ -704,7 +704,7 @@ func ToSet[T comparable]() core.Transformer[T, map[T]struct{}] {
 // Distinct creates a Transformer that only emits items that haven't been seen before.
 // Uses a map to track seen values, so T must be comparable.
 func Distinct[T comparable]() core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -749,7 +749,7 @@ func Distinct[T comparable]() core.Transformer[T, T] {
 // DistinctBy creates a Transformer that only emits items whose key (derived
 // by the keyFn) hasn't been seen before.
 func DistinctBy[T any, K comparable](keyFn func(T) K) core.Transformer[T, T] {
-	return core.Transmitter[T, T](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[T] {
 		out := make(chan core.Result[T])
 		go func() {
 			defer close(out)
@@ -798,7 +798,7 @@ type Indexed[T any] struct {
 }
 
 func WithIndex[T any]() core.Transformer[T, Indexed[T]] {
-	return core.Transmitter[T, Indexed[T]](func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[Indexed[T]] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[T]) <-chan core.Result[Indexed[T]] {
 		out := make(chan core.Result[Indexed[T]])
 		go func() {
 			defer close(out)

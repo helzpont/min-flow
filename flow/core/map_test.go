@@ -991,12 +991,12 @@ func TestMapper_ApplyWith_MapperError(t *testing.T) {
 
 	// Mapper that returns an error from the mapper function itself (not result error)
 	// This tests the err != nil path after calling the mapper
-	mapper := Mapper[int, int](func(res Result[int]) (Result[int], error) {
+	mapper := &Mapper[int, int]{fn: func(res Result[int]) (Result[int], error) {
 		if res.Value() == 2 {
 			return Result[int]{}, errors.New("mapper internal error")
 		}
 		return Ok(res.Value() * 2), nil
-	})
+	}}
 
 	stream := Emit(func(ctx context.Context) <-chan Result[int] {
 		ch := make(chan Result[int], 3)
@@ -1030,12 +1030,12 @@ func TestFlatMapper_ApplyWith_MapperError(t *testing.T) {
 	ctx := context.Background()
 
 	// FlatMapper that returns an error from the mapper function itself
-	mapper := FlatMapper[int, int](func(res Result[int]) ([]Result[int], error) {
+	mapper := &FlatMapper[int, int]{fn: func(res Result[int]) ([]Result[int], error) {
 		if res.Value() == 2 {
 			return nil, errors.New("flatmapper internal error")
 		}
 		return []Result[int]{Ok(res.Value() * 2)}, nil
-	})
+	}}
 
 	stream := Emit(func(ctx context.Context) <-chan Result[int] {
 		ch := make(chan Result[int], 3)
@@ -1066,14 +1066,14 @@ func TestFlatMapper_ApplyWith_MapperError(t *testing.T) {
 
 func TestFuse_FirstMapperError(t *testing.T) {
 	// First mapper returns error - it should be wrapped in the result
-	first := Mapper[int, int](func(res Result[int]) (Result[int], error) {
+	first := &Mapper[int, int]{fn: func(res Result[int]) (Result[int], error) {
 		return Result[int]{}, errors.New("first mapper error")
-	})
+	}}
 	second := Map(func(x int) (int, error) { return x * 2, nil })
 
 	fused := Fuse(first, second)
 
-	result, err := fused(Ok(1))
+	result, err := fused.fn(Ok(1))
 	// Fuse wraps mapper errors in Result, doesn't return them
 	if err != nil {
 		t.Errorf("Fuse should not return error, got %v", err)
@@ -1085,14 +1085,14 @@ func TestFuse_FirstMapperError(t *testing.T) {
 
 func TestFuseFlat_FirstMapperError(t *testing.T) {
 	// First flatmapper returns error - it should be wrapped
-	first := FlatMapper[int, int](func(res Result[int]) ([]Result[int], error) {
+	first := &FlatMapper[int, int]{fn: func(res Result[int]) ([]Result[int], error) {
 		return nil, errors.New("first flatmapper error")
-	})
+	}}
 	second := FlatMap(func(x int) ([]int, error) { return []int{x * 2}, nil })
 
 	fused := FuseFlat(first, second)
 
-	results, err := fused(Ok(1))
+	results, err := fused.fn(Ok(1))
 	// FuseFlat wraps errors in Result
 	if err != nil {
 		t.Errorf("FuseFlat should not return error, got %v", err)
@@ -1105,17 +1105,17 @@ func TestFuseFlat_FirstMapperError(t *testing.T) {
 func TestFuseFlat_SecondMapperError(t *testing.T) {
 	first := FlatMap(func(x int) ([]int, error) { return []int{x, x + 1}, nil })
 	// Second flatmapper returns error for specific values
-	second := FlatMapper[int, int](func(res Result[int]) ([]Result[int], error) {
+	second := &FlatMapper[int, int]{fn: func(res Result[int]) ([]Result[int], error) {
 		if res.Value() == 2 {
 			return nil, errors.New("second flatmapper error")
 		}
 		return []Result[int]{Ok(res.Value() * 10)}, nil
-	})
+	}}
 
 	fused := FuseFlat(first, second)
 
 	// Input 1 -> first produces [1, 2] -> second: 1->10, 2->error
-	results, err := fused(Ok(1))
+	results, err := fused.fn(Ok(1))
 	if err != nil {
 		t.Errorf("FuseFlat should not return error, got %v", err)
 	}
@@ -1141,12 +1141,12 @@ func TestFuseFlat_SecondMapperError(t *testing.T) {
 
 func TestToFlatMapper_MapperError(t *testing.T) {
 	// Mapper that returns an error - it should be wrapped
-	mapper := Mapper[int, int](func(res Result[int]) (Result[int], error) {
+	mapper := &Mapper[int, int]{fn: func(res Result[int]) (Result[int], error) {
 		return Result[int]{}, errors.New("mapper error")
-	})
+	}}
 
 	flat := mapper.ToFlatMapper()
-	results, err := flat(Ok(1))
+	results, err := flat.fn(Ok(1))
 
 	// ToFlatMapper wraps errors in Result
 	if err != nil {

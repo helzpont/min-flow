@@ -15,7 +15,7 @@ func Map[IN, OUT any](fn func(IN) OUT) Mapper[IN, OUT] {
 
 // Apply transforms a stream using this Mapper.
 func (m Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
-	return Emitter[OUT](func(ctx context.Context) <-chan OUT {
+	return Emit(func(ctx context.Context) <-chan OUT {
 		out := make(chan OUT, DefaultBufferSize)
 		go func() {
 			defer close(out)
@@ -42,7 +42,7 @@ func FlatMap[IN, OUT any](fn func(IN) []OUT) FlatMapper[IN, OUT] {
 
 // Apply transforms a stream using this FlatMapper.
 func (m FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
-	return Emitter[OUT](func(ctx context.Context) <-chan OUT {
+	return Emit(func(ctx context.Context) <-chan OUT {
 		out := make(chan OUT, DefaultBufferSize)
 		go func() {
 			defer close(out)
@@ -80,7 +80,7 @@ type filterTransformer[T any] struct {
 }
 
 func (f filterTransformer[T]) Apply(ctx context.Context, s Stream[T]) Stream[T] {
-	return Emitter[T](func(ctx context.Context) <-chan T {
+	return Emit(func(ctx context.Context) <-chan T {
 		out := make(chan T, DefaultBufferSize)
 		go func() {
 			defer close(out)
