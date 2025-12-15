@@ -298,3 +298,235 @@ func TestWriteLines_ErrorPassthrough(t *testing.T) {
 		t.Errorf("expected 1 error, got %d", errors)
 	}
 }
+
+func TestFromReader(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   []byte
+		chunkSize int
+		expected  [][]byte
+	}{
+		{
+			name:      "empty reader",
+			content:   []byte{},
+			chunkSize: 5,
+			expected:  [][]byte{},
+		},
+		{
+			name:      "single chunk",
+			content:   []byte("hi"),
+			chunkSize: 10,
+			expected:  [][]byte{[]byte("hi")},
+		},
+		{
+			name:      "multiple chunks exact",
+			content:   []byte("helloworld"),
+			chunkSize: 5,
+			expected:  [][]byte{[]byte("hello"), []byte("world")},
+		},
+		{
+			name:      "multiple chunks uneven",
+			content:   []byte("hello world"),
+			chunkSize: 5,
+			expected:  [][]byte{[]byte("hello"), []byte(" worl"), []byte("d")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := bytes.NewReader(tt.content)
+			ctx := context.Background()
+			stream := FromReader(reader, tt.chunkSize)
+
+			var results [][]byte
+			for res := range stream.Emit(ctx) {
+				if res.IsError() {
+					t.Fatalf("unexpected error: %v", res.Error())
+				}
+				results = append(results, res.Value())
+			}
+
+			if len(results) != len(tt.expected) {
+				t.Errorf("got %d chunks, want %d", len(results), len(tt.expected))
+				return
+			}
+
+			for i, chunk := range results {
+				if !bytes.Equal(chunk, tt.expected[i]) {
+					t.Errorf("chunk %d: got %q, want %q", i, chunk, tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestFromReader_ContextCancellation(t *testing.T) {
+	// Create a reader that returns data slowly
+	content := make([]byte, 10000)
+	for i := range content {
+		content[i] = byte(i % 256)
+	}
+	reader := bytes.NewReader(content)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stream := FromReader(reader, 10)
+
+	count := 0
+	for res := range stream.Emit(ctx) {
+		if res.IsError() {
+			t.Fatalf("unexpected error: %v", res.Error())
+		}
+		count++
+		if count >= 10 {
+			cancel()
+			break
+		}
+	}
+
+	if count < 10 {
+		t.Errorf("expected at least 10 chunks before cancel, got %d", count)
+	}
+}
+
+func TestFromReader_ReassembleContent(t *testing.T) {
+	// Test that content can be reassembled from chunks
+	content := []byte("The quick brown fox jumps over the lazy dog.")
+	reader := bytes.NewReader(content)
+
+	ctx := context.Background()
+	stream := FromReader(reader, 7)
+
+	var result []byte
+	for res := range stream.Emit(ctx) {
+		if res.IsError() {
+			t.Fatalf("unexpected error: %v", res.Error())
+		}
+		result = append(result, res.Value()...)
+	}
+
+	if !bytes.Equal(result, content) {
+		t.Errorf("reassembled content: got %q, want %q", result, content)
+	}
+}
+
+func TestToWriter(t *testing.T) {
+	tests := []struct {
+		name     string
+		chunks   [][]byte
+		expected []byte
+	}{
+		{
+			name:     "empty stream",
+			chunks:   [][]byte{},
+			expected: []byte{},
+		},
+		{
+			name:     "single chunk",
+			chunks:   [][]byte{[]byte("hello")},
+			expected: []byte("hello"),
+		},
+		{
+			name:     "multiple chunks",
+			chunks:   [][]byte{[]byte("hello"), []byte(" "), []byte("world")},
+			expected: []byte("hello world"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			ctx := context.Background()
+
+			input := core.Emit(func(ctx context.Context) <-chan core.Result[[]byte] {
+				out := make(chan core.Result[[]byte], len(tt.chunks))
+				for _, chunk := range tt.chunks {
+					out <- core.Ok(chunk)
+				}
+				close(out)
+				return out
+			})
+
+			output := ToWriter(&buf).Apply(ctx, input)
+
+			var results [][]byte
+			for res := range output.Emit(ctx) {
+				if res.IsError() {
+					t.Fatalf("unexpected error: %v", res.Error())
+				}
+				results = append(results, res.Value())
+			}
+
+			// Check passthrough
+			if len(results) != len(tt.chunks) {
+				t.Errorf("expected %d results, got %d", len(tt.chunks), len(results))
+			}
+
+			// Check buffer content
+			if !bytes.Equal(buf.Bytes(), tt.expected) {
+				t.Errorf("buffer content: got %q, want %q", buf.Bytes(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestToWriter_ErrorPassthrough(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := context.Background()
+	testErr := core.Err[[]byte](os.ErrNotExist)
+
+	input := core.Emit(func(ctx context.Context) <-chan core.Result[[]byte] {
+		out := make(chan core.Result[[]byte], 3)
+		out <- core.Ok([]byte("chunk1"))
+		out <- testErr
+		out <- core.Ok([]byte("chunk2"))
+		close(out)
+		return out
+	})
+
+	output := ToWriter(&buf).Apply(ctx, input)
+
+	var values int
+	var errors int
+	for res := range output.Emit(ctx) {
+		if res.IsError() {
+			errors++
+		} else {
+			values++
+		}
+	}
+
+	if values != 2 {
+		t.Errorf("expected 2 values, got %d", values)
+	}
+	if errors != 1 {
+		t.Errorf("expected 1 error, got %d", errors)
+	}
+
+	// Only non-error chunks should be written
+	expected := []byte("chunk1chunk2")
+	if !bytes.Equal(buf.Bytes(), expected) {
+		t.Errorf("buffer content: got %q, want %q", buf.Bytes(), expected)
+	}
+}
+
+func TestFromReader_ToWriter_Roundtrip(t *testing.T) {
+	// Test a complete FromReader -> ToWriter pipeline
+	content := []byte("This is test content for the roundtrip test.")
+	reader := bytes.NewReader(content)
+	var writer bytes.Buffer
+
+	ctx := context.Background()
+	stream := FromReader(reader, 8)
+	output := ToWriter(&writer).Apply(ctx, stream)
+
+	for res := range output.Emit(ctx) {
+		if res.IsError() {
+			t.Fatalf("unexpected error: %v", res.Error())
+		}
+	}
+
+	if !bytes.Equal(writer.Bytes(), content) {
+		t.Errorf("roundtrip content: got %q, want %q", writer.Bytes(), content)
+	}
+}

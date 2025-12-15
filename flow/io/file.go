@@ -273,3 +273,105 @@ func WriteTo(w io.Writer) core.Transformer[string, string] {
 		return out
 	})
 }
+
+// FromReader creates a Stream that reads from an io.Reader in chunks of the specified size.
+// This is a low-level byte-oriented stream useful for processing binary data or
+// when you need control over how data is chunked from any io.Reader source.
+func FromReader(r io.Reader, chunkSize int) core.Stream[[]byte] {
+	return FromReaderBuffered(r, chunkSize, DefaultBufferSize)
+}
+
+// FromReaderBuffered creates a FromReader stream with a specified channel buffer size.
+func FromReaderBuffered(r io.Reader, chunkSize int, bufferSize int) core.Stream[[]byte] {
+	return core.Emit(func(ctx context.Context) <-chan core.Result[[]byte] {
+		out := make(chan core.Result[[]byte], bufferSize)
+
+		go func() {
+			defer close(out)
+
+			buf := make([]byte, chunkSize)
+			for {
+				n, err := r.Read(buf)
+				if n > 0 {
+					chunk := make([]byte, n)
+					copy(chunk, buf[:n])
+
+					select {
+					case <-ctx.Done():
+						return
+					case out <- core.Ok(chunk):
+					}
+				}
+
+				if err == io.EOF {
+					return
+				}
+				if err != nil {
+					select {
+					case <-ctx.Done():
+					case out <- core.Err[[]byte](err):
+					}
+					return
+				}
+			}
+		}()
+
+		return out
+	})
+}
+
+// ToWriter creates a Transformer that writes each []byte to an io.Writer.
+// Items pass through unchanged after being written.
+// This is the byte-oriented counterpart to WriteTo for string streams.
+func ToWriter(w io.Writer) core.Transformer[[]byte, []byte] {
+	return ToWriterBuffered(w, DefaultBufferSize)
+}
+
+// ToWriterBuffered creates a ToWriter transformer with a specified channel buffer size.
+func ToWriterBuffered(w io.Writer, bufferSize int) core.Transformer[[]byte, []byte] {
+	return core.Transmit(func(ctx context.Context, in <-chan core.Result[[]byte]) <-chan core.Result[[]byte] {
+		out := make(chan core.Result[[]byte], bufferSize)
+
+		go func() {
+			defer close(out)
+
+			writer := bufio.NewWriter(w)
+			defer writer.Flush()
+
+			for res := range in {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				if res.IsError() || res.IsSentinel() {
+					select {
+					case <-ctx.Done():
+						return
+					case out <- res:
+					}
+					continue
+				}
+
+				data := res.Value()
+				if _, err := writer.Write(data); err != nil {
+					select {
+					case <-ctx.Done():
+						return
+					case out <- core.Err[[]byte](err):
+					}
+					continue
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				case out <- res:
+				}
+			}
+		}()
+
+		return out
+	})
+}
