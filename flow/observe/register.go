@@ -18,10 +18,7 @@ import (
 //	ctx := WithValueHook(ctx, func(v int) { fmt.Println("Value:", v) })
 //	ctx = WithErrorHook(ctx, func(err error) { log.Error(err) })
 //
-//	// Stream processing automatically invokes registered hooks
-//	result := someMapper.Apply(ctx, stream)
-
-// WithValueHook attaches a value observation hook for type T to the context.
+//	// Stream processing automatically invokes registered hooks\n//\tresult := someMapper.Apply(stream)\n\n// WithValueHook attaches a value observation hook for type T to the context.
 // The callback fires for each successful value emitted.
 func WithValueHook[T any](ctx context.Context, callback func(T)) context.Context {
 	return core.WithHooks(ctx, core.Hooks[T]{

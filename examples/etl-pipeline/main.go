@@ -66,7 +66,7 @@ Frank,35,Sydney,Australia`
 	records := csv.ReadRecords(inputFile)
 
 	// Step 2: Skip header row
-	dataRows := csv.SkipHeader().Apply(ctx, records)
+	dataRows := csv.SkipHeader().Apply(records)
 
 	// Step 3: Transform - Parse CSV records into Person structs
 	people := flow.Map(func(record []string) (Person, error) {
@@ -83,18 +83,18 @@ Frank,35,Sydney,Australia`
 			City:    record[2],
 			Country: record[3],
 		}, nil
-	}).Apply(ctx, dataRows)
+	}).Apply(dataRows)
 
 	// Step 4: Filter - Keep only adults (age >= 18)
 	adults := filter.Where(func(p Person) bool {
 		return p.Age >= 18
-	}).Apply(ctx, people)
+	}).Apply(people)
 
 	// Step 5: Load - Convert to JSON and write to file
-	jsonLines := flowjson.Encode[Person]().Apply(ctx, adults)
+	jsonLines := flowjson.Encode[Person]().Apply(adults)
 
 	// Collect JSON lines to write
-	output := io.WriteLines(outputFile).Apply(ctx, jsonLines)
+	output := io.WriteLines(outputFile).Apply(jsonLines)
 
 	// Process the stream
 	var count int
@@ -124,7 +124,7 @@ func aggregationExample(inputFile string) {
 
 	// Read and parse all people
 	records := csv.ReadRecords(inputFile)
-	dataRows := csv.SkipHeader().Apply(ctx, records)
+	dataRows := csv.SkipHeader().Apply(records)
 
 	people := flow.Map(func(record []string) (Person, error) {
 		age, _ := strconv.Atoi(record[1])
@@ -134,7 +134,7 @@ func aggregationExample(inputFile string) {
 			City:    record[2],
 			Country: record[3],
 		}, nil
-	}).Apply(ctx, dataRows)
+	}).Apply(dataRows)
 
 	// Use Fold to compute statistics in a single pass
 	type accumulator struct {
@@ -151,7 +151,7 @@ func aggregationExample(inputFile string) {
 			acc.cities[p.City] = true
 			return acc
 		},
-	).Apply(ctx, people)
+	).Apply(people)
 
 	// Convert to final statistics
 	finalStats := flow.Map(func(acc accumulator) (Statistics, error) {
@@ -164,10 +164,10 @@ func aggregationExample(inputFile string) {
 			AvgAge:      avgAge,
 			Cities:      len(acc.cities),
 		}, nil
-	}).Apply(ctx, stats)
+	}).Apply(stats)
 
 	// Output statistics
-	jsonStats := flowjson.Encode[Statistics]().Apply(ctx, finalStats)
+	jsonStats := flowjson.Encode[Statistics]().Apply(finalStats)
 
 	for res := range jsonStats.All(ctx) {
 		if res.IsValue() {

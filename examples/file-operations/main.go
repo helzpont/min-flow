@@ -55,7 +55,7 @@ func directoryAnalysis(dir string) {
 	files := glob.WalkFiles(dir)
 
 	// Get file info for each
-	stats := glob.Stat().Apply(ctx, files)
+	stats := glob.Stat().Apply(files)
 
 	// Collect results
 	fmt.Println("Files found:")
@@ -79,7 +79,7 @@ func fileFiltering(dir string) {
 	files := glob.WalkFiles(dir)
 
 	// Filter by extension using glob pattern
-	txtFiles := glob.Filter("*.txt").Apply(ctx, files)
+	txtFiles := glob.Filter("*.txt").Apply(files)
 
 	fmt.Println("Text files only:")
 	for res := range txtFiles.All(ctx) {
@@ -90,10 +90,10 @@ func fileFiltering(dir string) {
 
 	// Filter by size (files larger than 20 bytes)
 	allFiles := glob.WalkFiles(dir)
-	withInfo := glob.Stat().Apply(ctx, allFiles)
+	withInfo := glob.Stat().Apply(allFiles)
 	largeFiles := filter.Where(func(info glob.FileInfo) bool {
 		return info.Size > 20
-	}).Apply(ctx, withInfo)
+	}).Apply(withInfo)
 
 	fmt.Println("\nFiles larger than 20 bytes:")
 	for res := range largeFiles.All(ctx) {
@@ -112,7 +112,7 @@ func parallelFileProcessing(dir string) {
 
 	// Get all text files
 	files := glob.WalkFiles(dir)
-	txtFiles := glob.Filter("*.txt").Apply(ctx, files)
+	txtFiles := glob.Filter("*.txt").Apply(files)
 
 	// Compute MD5 checksums in parallel
 	checksums := parallel.Map(4, func(path string) FileStats {
@@ -127,7 +127,7 @@ func parallelFileProcessing(dir string) {
 			Size:     info.Size(),
 			Checksum: fmt.Sprintf("%x", hash),
 		}
-	}).Apply(ctx, txtFiles)
+	}).Apply(txtFiles)
 
 	fmt.Println("File checksums (computed in parallel):")
 	for res := range checksums.All(ctx) {
@@ -146,7 +146,7 @@ func fileAggregation(dir string) {
 
 	// Walk all files
 	files := glob.WalkFiles(dir)
-	withInfo := glob.Stat().Apply(ctx, files)
+	withInfo := glob.Stat().Apply(files)
 
 	// Aggregate statistics using Fold
 	stats := aggregate.Fold(
@@ -161,7 +161,7 @@ func fileAggregation(dir string) {
 			acc.Extensions[ext]++
 			return acc
 		},
-	).Apply(ctx, withInfo)
+	).Apply(withInfo)
 
 	// Print statistics
 	for res := range stats.All(ctx) {
@@ -192,7 +192,7 @@ func fileAggregation(dir string) {
 			ext = "(none)"
 		}
 		return FileWithExt{Path: path, Ext: ext}, nil
-	}).Apply(ctx, allFiles)
+	}).Apply(allFiles)
 
 	// Collect and group
 	groups := make(map[string][]string)
@@ -228,15 +228,15 @@ func batchProcessing(dir string) {
 		}
 		// Return each line as a separate item
 		return strings.Split(string(data), "\n"), nil
-	}).Apply(ctx, files)
+	}).Apply(files)
 
 	// Filter non-empty lines
 	nonEmpty := filter.Where(func(line string) bool {
 		return strings.TrimSpace(line) != ""
-	}).Apply(ctx, contents)
+	}).Apply(contents)
 
 	// Batch lines for processing (e.g., for bulk insert)
-	batched := aggregate.Batch[string](5).Apply(ctx, nonEmpty)
+	batched := aggregate.Batch[string](5).Apply(nonEmpty)
 
 	fmt.Println("Processing lines in batches of 5:")
 	batchNum := 1
@@ -254,15 +254,15 @@ func batchProcessing(dir string) {
 	allFilePaths := glob.WalkFiles(dir)
 	paths := filter.Where(func(path string) bool {
 		return strings.HasSuffix(path, ".txt") && !strings.Contains(path, "output")
-	}).Apply(ctx, allFilePaths)
+	}).Apply(allFilePaths)
 
 	// Collect paths and write summary
 	pathList := flow.Map(func(path string) (string, error) {
 		rel, _ := filepath.Rel(dir, path)
 		return "- " + rel, nil
-	}).Apply(ctx, paths)
+	}).Apply(paths)
 
-	written := io.WriteLines(outputFile).Apply(ctx, pathList)
+	written := io.WriteLines(outputFile).Apply(pathList)
 
 	var count int
 	for range written.All(ctx) {

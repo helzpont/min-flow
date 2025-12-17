@@ -24,7 +24,7 @@ func TestMaterializeNotification(t *testing.T) {
 	})
 	stream := emitter
 
-	result := observe.MaterializeNotification[int]().Apply(ctx, stream)
+	result := observe.MaterializeNotification[int]().Apply(stream)
 
 	var notifications []observe.Notification[int]
 	for r := range result.Emit(ctx) {
@@ -68,7 +68,7 @@ func TestDematerializeNotification(t *testing.T) {
 	})
 	stream := emitter
 
-	result := observe.DematerializeNotification[int]().Apply(ctx, stream)
+	result := observe.DematerializeNotification[int]().Apply(stream)
 
 	var values []int
 	var errCount int

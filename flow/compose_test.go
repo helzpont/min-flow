@@ -26,7 +26,7 @@ func TestThrough(t *testing.T) {
 	combined := flow.Through(double, addOne)
 
 	stream := flow.FromSlice([]int{1, 2, 3})
-	result, err := flow.Slice(ctx, combined.Apply(ctx, stream))
+	result, err := flow.Slice(ctx, combined.Apply(stream))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestChain(t *testing.T) {
 
 			chained := flow.Chain(tt.transformers...)
 			stream := flow.FromSlice(tt.input)
-			result, err := flow.Slice(ctx, chained.Apply(ctx, stream))
+			result, err := flow.Slice(ctx, chained.Apply(stream))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -191,7 +191,7 @@ func TestMapper(t *testing.T) {
 			// Mapper implements Transformer directly
 			transformer := flow.Map(tt.mapper)
 			stream := flow.FromSlice(tt.input)
-			result, err := flow.Slice(ctx, transformer.Apply(ctx, stream))
+			result, err := flow.Slice(ctx, transformer.Apply(stream))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -220,7 +220,7 @@ func TestFlatMapper(t *testing.T) {
 	})
 
 	stream := flow.FromSlice([]int{1, 2})
-	result, err := flow.Slice(ctx, transformer.Apply(ctx, stream))
+	result, err := flow.Slice(ctx, transformer.Apply(stream))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -250,7 +250,7 @@ func TestFlatMapper_Filter(t *testing.T) {
 	})
 
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
-	result, err := flow.Slice(ctx, transformer.Apply(ctx, stream))
+	result, err := flow.Slice(ctx, transformer.Apply(stream))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestTransmitter(t *testing.T) {
 	})
 
 	stream := flow.FromSlice([]int{1, 2, 3})
-	result, err := flow.Slice(ctx, transmitter.Apply(ctx, stream))
+	result, err := flow.Slice(ctx, transmitter.Apply(stream))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -40,7 +40,7 @@ func TestOnErrorDo(t *testing.T) {
 	})
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if len(errors) != 2 {
@@ -65,7 +65,7 @@ func TestWithErrorCounter(t *testing.T) {
 	})
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if counter.Count() != 2 {
@@ -93,7 +93,7 @@ func TestWithErrorCounterWithPredicate(t *testing.T) {
 	})
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if counter.Count() != 1 {
@@ -118,7 +118,7 @@ func TestWithErrorCollector(t *testing.T) {
 	})
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if len(collector.Errors()) != 2 {
@@ -146,7 +146,7 @@ func TestWithErrorCollectorMaxErrors(t *testing.T) {
 	})
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if len(collector.Errors()) != 1 {
@@ -174,7 +174,7 @@ func TestWithCircuitBreakerMonitor(t *testing.T) {
 		})
 
 		mapper := core.Map(func(x int) (int, error) { return x, nil })
-		output := mapper.Apply(ctx, input)
+		output := mapper.Apply(input)
 		_, _ = core.Slice(ctx, output)
 
 		if !thresholdHit {
@@ -201,7 +201,7 @@ func TestWithCircuitBreakerMonitor(t *testing.T) {
 		})
 
 		mapper := core.Map(func(x int) (int, error) { return x, nil })
-		output := mapper.Apply(ctx, input)
+		output := mapper.Apply(input)
 		_, _ = core.Slice(ctx, output)
 
 		if cb.IsOpen() {

@@ -221,7 +221,7 @@ func TestFuse(t *testing.T) {
 			return ch
 		})
 
-		collected := fused.Apply(ctx, stream).Collect(ctx)
+		collected := fused.Apply(stream).Collect(ctx)
 
 		want := []int{12, 20, 30} // (1*2)+10=12, (5*2)+10=20, (10*2)+10=30
 		if len(collected) != len(want) {
@@ -250,7 +250,7 @@ func TestFuse(t *testing.T) {
 			return ch
 		})
 
-		collected := fused.Apply(ctx, stream).Collect(ctx)
+		collected := fused.Apply(stream).Collect(ctx)
 
 		want := []string{"14", "42"}
 		if len(collected) != len(want) {
@@ -284,7 +284,7 @@ func TestFuse(t *testing.T) {
 			return ch
 		})
 
-		collected := fused.Apply(ctx, stream).Collect(ctx)
+		collected := fused.Apply(stream).Collect(ctx)
 
 		if len(collected) != 2 {
 			t.Fatalf("got %d results, want 2", len(collected))
@@ -317,7 +317,7 @@ func TestFuse(t *testing.T) {
 			return ch
 		})
 
-		collected := fused.Apply(ctx, stream).Collect(ctx)
+		collected := fused.Apply(stream).Collect(ctx)
 
 		if len(collected) != 2 {
 			t.Fatalf("got %d results, want 2", len(collected))
@@ -344,7 +344,7 @@ func TestFuse(t *testing.T) {
 			return ch
 		})
 
-		collected := fused.Apply(ctx, stream).Collect(ctx)
+		collected := fused.Apply(stream).Collect(ctx)
 
 		if len(collected) != 1 {
 			t.Fatalf("got %d results, want 1", len(collected))
@@ -448,7 +448,7 @@ func TestFuseMapFlat(t *testing.T) {
 	fused := FuseFlat(double.ToFlatMapper(), duplicate)
 
 	stream := streamFromSlice([]int{1, 2, 3})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	// (1*2, 1*2), (2*2, 2*2), (3*2, 3*2) = 2,2,4,4,6,6
@@ -472,7 +472,7 @@ func TestFuseFlatMap(t *testing.T) {
 	fused := FuseFlat(duplicate, double.ToFlatMapper())
 
 	stream := streamFromSlice([]int{1, 2})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	// (1,1) -> (2,2), (2,2) -> (4,4) = 2,2,4,4
@@ -496,7 +496,7 @@ func TestFuseFlat(t *testing.T) {
 	fused := FuseFlat(duplicate, triple)
 
 	stream := streamFromSlice([]int{1})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	// 1 -> (1,1) -> (1,1,1,1,1,1)
@@ -515,7 +515,7 @@ func TestFuseMapFilter(t *testing.T) {
 	fused := FuseFlat(double.ToFlatMapper(), isEven.ToFlatMapper())
 
 	stream := streamFromSlice([]int{1, 2, 3})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	want := []int{2, 4, 6}
@@ -527,7 +527,7 @@ func TestFuseMapFilter(t *testing.T) {
 	greaterThan3 := Predicate[int](func(x int) bool { return x > 3 })
 	fused2 := FuseFlat(double.ToFlatMapper(), greaterThan3.ToFlatMapper())
 	stream2 := streamFromSlice([]int{1, 2, 3})
-	collected2 := fused2.Apply(ctx, stream2).Collect(ctx)
+	collected2 := fused2.Apply(stream2).Collect(ctx)
 	values2 := collectValues(collected2)
 
 	// 1*2=2 (filtered), 2*2=4 (pass), 3*2=6 (pass)
@@ -546,7 +546,7 @@ func TestFuseFilterMap(t *testing.T) {
 	fused := FuseFlat(isPositive.ToFlatMapper(), double.ToFlatMapper())
 
 	stream := streamFromSlice([]int{-1, 0, 1, 2})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	// -1 (filtered), 0 (filtered), 1*2=2, 2*2=4
@@ -570,7 +570,7 @@ func TestFuseFlatFilter(t *testing.T) {
 	fused := FuseFlat(expand, isPositive.ToFlatMapper())
 
 	stream := streamFromSlice([]int{1})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	// 1 -> (0, 1, 2) -> filter -> (1, 2)
@@ -589,7 +589,7 @@ func TestFuseFilterFlat(t *testing.T) {
 	fused := FuseFlat(isPositive.ToFlatMapper(), duplicate)
 
 	stream := streamFromSlice([]int{-1, 1, 2})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	// -1 (filtered), 1 -> (1,1), 2 -> (2,2)
@@ -608,7 +608,7 @@ func TestFuseFilters(t *testing.T) {
 	fused := FuseFlat(isPositive.ToFlatMapper(), isEven.ToFlatMapper())
 
 	stream := streamFromSlice([]int{-2, -1, 0, 1, 2, 3, 4})
-	collected := fused.Apply(ctx, stream).Collect(ctx)
+	collected := fused.Apply(stream).Collect(ctx)
 	values := collectValues(collected)
 
 	// Only positive AND even: 2, 4
@@ -637,7 +637,7 @@ func TestFuseErrorPropagation(t *testing.T) {
 		fused := FuseFlat(errMapper.ToFlatMapper(), duplicate)
 
 		stream := streamFromSlice([]int{-1, 1})
-		collected := fused.Apply(ctx, stream).Collect(ctx)
+		collected := fused.Apply(stream).Collect(ctx)
 
 		if len(collected) != 3 { // 1 error + 2 values
 			t.Fatalf("got %d results, want 3", len(collected))
@@ -658,7 +658,7 @@ func TestFuseErrorPropagation(t *testing.T) {
 		fused := FuseFlat(errFlat, double.ToFlatMapper())
 
 		stream := streamFromSlice([]int{-1, 1})
-		collected := fused.Apply(ctx, stream).Collect(ctx)
+		collected := fused.Apply(stream).Collect(ctx)
 
 		if !collected[0].IsError() {
 			t.Error("first result should be error")
@@ -677,7 +677,7 @@ func TestToFlatMapper(t *testing.T) {
 		flat := double.ToFlatMapper()
 
 		stream := streamFromSlice([]int{1, 2, 3})
-		collected := flat.Apply(ctx, stream).Collect(ctx)
+		collected := flat.Apply(stream).Collect(ctx)
 		values := collectValues(collected)
 
 		want := []int{2, 4, 6}
@@ -696,7 +696,7 @@ func TestToFlatMapper(t *testing.T) {
 		flat := isPositive.ToFlatMapper()
 
 		stream := streamFromSlice([]int{-1, 0, 1, 2})
-		collected := flat.Apply(ctx, stream).Collect(ctx)
+		collected := flat.Apply(stream).Collect(ctx)
 		values := collectValues(collected)
 
 		want := []int{1, 2}
@@ -722,7 +722,7 @@ func TestToFlatMapper(t *testing.T) {
 			return ch
 		})
 
-		collected := flat.Apply(ctx, stream).Collect(ctx)
+		collected := flat.Apply(stream).Collect(ctx)
 
 		if len(collected) != 2 {
 			t.Fatalf("got %d results, want 2", len(collected))
@@ -755,7 +755,7 @@ func TestMap_PanicRecovery(t *testing.T) {
 		return ch
 	})
 
-	collected := panicMapper.Apply(ctx, stream).Collect(ctx)
+	collected := panicMapper.Apply(stream).Collect(ctx)
 
 	if len(collected) != 3 {
 		t.Fatalf("got %d results, want 3", len(collected))
@@ -796,7 +796,7 @@ func TestFlatMap_PanicRecovery(t *testing.T) {
 		return ch
 	})
 
-	collected := panicMapper.Apply(ctx, stream).Collect(ctx)
+	collected := panicMapper.Apply(stream).Collect(ctx)
 
 	// Should have: [1, 10], [error], [3, 30]
 	var values []int
@@ -841,7 +841,7 @@ func TestMapper_ApplyWith_ContextCancellation(t *testing.T) {
 		return ch
 	})
 
-	result := slowMapper.Apply(ctx, stream)
+	result := slowMapper.Apply(stream)
 	resultCh := result.Emit(ctx)
 
 	// Read a few items then cancel
@@ -887,7 +887,7 @@ func TestFlatMapper_ApplyWith_ContextCancellation(t *testing.T) {
 		return ch
 	})
 
-	result := flatMapper.Apply(ctx, stream)
+	result := flatMapper.Apply(stream)
 	resultCh := result.Emit(ctx)
 
 	// Read a few items then cancel
@@ -1223,7 +1223,7 @@ func TestIterFlatMap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ifm := IterFlatMap(tt.flatMapFn)
 			stream := streamFromSlice(tt.input)
-			result := ifm.Apply(ctx, stream)
+			result := ifm.Apply(stream)
 			collected := result.Collect(ctx)
 
 			if len(collected) != len(tt.wantValues) {
@@ -1279,7 +1279,7 @@ func TestIterFlatMapSlice(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ifm := IterFlatMapSlice(tt.flatMapFn)
 			stream := streamFromSlice(tt.input)
-			result := ifm.Apply(ctx, stream)
+			result := ifm.Apply(stream)
 			collected := result.Collect(ctx)
 
 			var values []int
@@ -1321,7 +1321,7 @@ func TestIterFlatMapper_PanicRecovery(t *testing.T) {
 		})
 
 		stream := streamFromSlice([]int{1, 2, 3})
-		result := ifm.Apply(ctx, stream)
+		result := ifm.Apply(stream)
 		collected := result.Collect(ctx)
 
 		var values []int
@@ -1355,7 +1355,7 @@ func TestIterFlatMapper_PanicRecovery(t *testing.T) {
 		})
 
 		stream := streamFromSlice([]int{1, 2, 3})
-		result := ifm.Apply(ctx, stream)
+		result := ifm.Apply(stream)
 		collected := result.Collect(ctx)
 
 		var values []int
@@ -1396,7 +1396,7 @@ func TestIterFlatMapper_ErrorPropagation(t *testing.T) {
 		return ch
 	})
 
-	result := ifm.Apply(ctx, stream)
+	result := ifm.Apply(stream)
 	collected := result.Collect(ctx)
 
 	if len(collected) != 3 {

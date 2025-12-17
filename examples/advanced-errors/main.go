@@ -46,7 +46,7 @@ func retryWithJitterExample() {
 	// Exponential backoff: 10ms * 2^attempt, with jitter, max 500ms
 	backoff := flowerrors.ExponentialBackoff(10*time.Millisecond, 500*time.Millisecond)
 
-	retried := flowerrors.RetryWithBackoff(5, backoff, flakyMultiplier).Apply(ctx, ids)
+	retried := flowerrors.RetryWithBackoff(5, backoff, flakyMultiplier).Apply(ids)
 
 	fmt.Println("Processing with exponential backoff:")
 	start := time.Now()
@@ -82,7 +82,7 @@ func circuitBreakerExample() {
 
 	fmt.Println("Processing (should trigger circuit breaker after 3 failures):")
 	numbers := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
-	processed := flow.Map(failingService).Apply(ctx, numbers)
+	processed := flow.Map(failingService).Apply(numbers)
 
 	for res := range processed.All(ctx) {
 		if res.IsError() {
@@ -117,8 +117,8 @@ func fallbackWithTransformerExample() {
 	numbers := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
 
 	// Apply service, then use Fallback transformer to handle errors
-	processed := flow.Map(failingService).Apply(ctx, numbers)
-	withFallback := flowerrors.Fallback(fallbackFn).Apply(ctx, processed)
+	processed := flow.Map(failingService).Apply(numbers)
+	withFallback := flowerrors.Fallback(fallbackFn).Apply(processed)
 
 	fmt.Println("Results with fallback:")
 	for res := range withFallback.All(ctx) {
@@ -148,7 +148,7 @@ func errorAggregationExample() {
 			return 0, fmt.Errorf("divisible by 5: %d", n)
 		}
 		return n * 10, nil
-	}).Apply(ctx, items)
+	}).Apply(items)
 
 	// Consume the stream
 	var successCount int
@@ -184,7 +184,7 @@ func partialFailureExample() {
 			return 0, fmt.Errorf("failed for id %d", n)
 		}
 		return n * 100, nil
-	}).Apply(ctx, ids)
+	}).Apply(ids)
 
 	fmt.Println("Processing batch:")
 	var successful []int

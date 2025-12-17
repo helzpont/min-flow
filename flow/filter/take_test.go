@@ -51,7 +51,7 @@ func TestTake(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			taken := filter.Take[int](tt.n).Apply(ctx, stream)
+			taken := filter.Take[int](tt.n).Apply(stream)
 			got, err := flow.Slice[int](ctx, taken)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -105,7 +105,7 @@ func TestTakeWhile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			taken := filter.TakeWhile(tt.predicate).Apply(ctx, stream)
+			taken := filter.TakeWhile(tt.predicate).Apply(stream)
 			got, err := flow.Slice[int](ctx, taken)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -165,7 +165,7 @@ func TestSkip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			skipped := filter.Skip[int](tt.n).Apply(ctx, stream)
+			skipped := filter.Skip[int](tt.n).Apply(stream)
 			got, err := flow.Slice[int](ctx, skipped)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -219,7 +219,7 @@ func TestSkipWhile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			skipped := filter.SkipWhile(tt.predicate).Apply(ctx, stream)
+			skipped := filter.SkipWhile(tt.predicate).Apply(stream)
 			got, err := flow.Slice[int](ctx, skipped)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -279,7 +279,7 @@ func TestLast(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			last := filter.Last[int](tt.n).Apply(ctx, stream)
+			last := filter.Last[int](tt.n).Apply(stream)
 			got, err := flow.Slice[int](ctx, last)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -299,7 +299,7 @@ func TestLast(t *testing.T) {
 func TestFirst(t *testing.T) {
 	ctx := context.Background()
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-	first := filter.First[int]().Apply(ctx, stream)
+	first := filter.First[int]().Apply(stream)
 
 	got, err := flow.Slice[int](ctx, first)
 	if err != nil {
@@ -352,7 +352,7 @@ func TestNth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			nth := filter.Nth[int](tt.n).Apply(ctx, stream)
+			nth := filter.Nth[int](tt.n).Apply(stream)
 			got, err := flow.Slice[int](ctx, nth)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -374,7 +374,7 @@ func TestTakeContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-	taken := filter.Take[int](3).Apply(ctx, stream)
+	taken := filter.Take[int](3).Apply(stream)
 
 	got, _ := flow.Slice[int](ctx, taken)
 	// Should get empty or partial result due to cancellation

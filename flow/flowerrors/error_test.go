@@ -77,7 +77,7 @@ func TestCatchError(t *testing.T) {
 			})
 			stream := emitter
 
-			result := flowerrors.CatchError(tt.predicate, tt.handler).Apply(ctx, stream)
+			result := flowerrors.CatchError(tt.predicate, tt.handler).Apply(stream)
 
 			var values []int
 			var errCount int
@@ -128,7 +128,7 @@ func TestFilterErrors(t *testing.T) {
 		return errors.Is(err, errToFilter)
 	}
 
-	result := flowerrors.FilterErrors[int](predicate).Apply(ctx, stream)
+	result := flowerrors.FilterErrors[int](predicate).Apply(stream)
 
 	var values []int
 	var errCount int
@@ -174,7 +174,7 @@ func TestIgnoreErrors(t *testing.T) {
 	})
 	stream := emitter
 
-	result := flowerrors.IgnoreErrors[int]().Apply(ctx, stream)
+	result := flowerrors.IgnoreErrors[int]().Apply(stream)
 	got, err := flow.Slice[int](ctx, result)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -210,7 +210,7 @@ func TestMapErrors(t *testing.T) {
 		return fmt.Errorf("wrapped: %w", err)
 	}
 
-	result := flowerrors.MapErrors[int](mapper).Apply(ctx, stream)
+	result := flowerrors.MapErrors[int](mapper).Apply(stream)
 
 	var values []int
 	var errMsgs []string
@@ -250,7 +250,7 @@ func TestWrapError(t *testing.T) {
 		return fmt.Errorf("outer: %w", err)
 	}
 
-	result := flowerrors.WrapError[int](wrapper).Apply(ctx, stream)
+	result := flowerrors.WrapError[int](wrapper).Apply(stream)
 
 	for r := range result.Emit(ctx) {
 		if r.IsError() {
@@ -280,7 +280,7 @@ func TestErrorsOnly(t *testing.T) {
 	})
 	stream := emitter
 
-	result := flowerrors.ErrorsOnly[int]().Apply(ctx, stream)
+	result := flowerrors.ErrorsOnly[int]().Apply(stream)
 
 	var errCount int
 	var valueCount int
@@ -321,7 +321,7 @@ func TestMaterialize(t *testing.T) {
 	})
 	stream := emitter
 
-	result := flowerrors.Materialize[int]().Apply(ctx, stream)
+	result := flowerrors.Materialize[int]().Apply(stream)
 
 	var materialized []flowerrors.Materialized[int]
 	for r := range result.Emit(ctx) {
@@ -366,7 +366,7 @@ func TestDematerialize(t *testing.T) {
 	})
 	stream := emitter
 
-	result := flowerrors.Dematerialize[int]().Apply(ctx, stream)
+	result := flowerrors.Dematerialize[int]().Apply(stream)
 
 	var values []int
 	var errCount int
@@ -406,7 +406,7 @@ func TestThrowOnError(t *testing.T) {
 	})
 	stream := emitter
 
-	result := flowerrors.ThrowOnError[int]().Apply(ctx, stream)
+	result := flowerrors.ThrowOnError[int]().Apply(stream)
 
 	var values []int
 	var errCount int

@@ -954,7 +954,7 @@ func TestStartWith(t *testing.T) {
 			defer cancel()
 
 			stream := flow.FromSlice(tt.input)
-			result := flow.StartWith[int](tt.prepend...).Apply(ctx, stream)
+			result := flow.StartWith[int](tt.prepend...).Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -1006,7 +1006,7 @@ func TestEndWith(t *testing.T) {
 			defer cancel()
 
 			stream := flow.FromSlice(tt.input)
-			result := flow.EndWith[int](tt.append...).Apply(ctx, stream)
+			result := flow.EndWith[int](tt.append...).Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

@@ -21,7 +21,7 @@ func (s Sink[IN, OUT]) From(ctx context.Context, stream Stream[IN]) (OUT, error)
 
 // Apply implements Transformer, producing a single-element Stream containing the result.
 // This allows Sinks to be composed with other Transformers in a pipeline.
-func (s Sink[IN, OUT]) Apply(ctx context.Context, stream Stream[IN]) Stream[OUT] {
+func (s Sink[IN, OUT]) Apply(stream Stream[IN]) Stream[OUT] {
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
 		out := make(chan Result[OUT], 1)
 		go func() {

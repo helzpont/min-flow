@@ -24,7 +24,7 @@ func BenchmarkFastVsCore_Map(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
-			mapped := mapper.Apply(ctx, stream)
+			mapped := mapper.Apply(stream)
 			_, _ = core.Slice(ctx, mapped)
 		}
 	})
@@ -35,7 +35,7 @@ func BenchmarkFastVsCore_Map(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
-			mapped := mapper.Apply(ctx, stream)
+			mapped := mapper.Apply(stream)
 			_ = fast.Slice(ctx, mapped)
 		}
 	})
@@ -50,9 +50,9 @@ func BenchmarkFastVsCore_MapFilterReduce(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
-			mapped := core.Map(squareWithErr).Apply(ctx, stream)
-			filtered := filter.Where(isEven).Apply(ctx, mapped)
-			reduced := aggregate.Reduce(add).Apply(ctx, filtered)
+			mapped := core.Map(squareWithErr).Apply(stream)
+			filtered := filter.Where(isEven).Apply(mapped)
+			reduced := aggregate.Reduce(add).Apply(filtered)
 			_, _ = core.Slice(ctx, reduced)
 		}
 	})
@@ -62,9 +62,9 @@ func BenchmarkFastVsCore_MapFilterReduce(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
-			mapped := fast.Map(square).Apply(ctx, stream)
-			filtered := fast.Filter(isEven).Apply(ctx, mapped)
-			reduced := fast.Reduce(add).Apply(ctx, filtered)
+			mapped := fast.Map(square).Apply(stream)
+			filtered := fast.Filter(isEven).Apply(mapped)
+			reduced := fast.Reduce(add).Apply(filtered)
 			_ = fast.Slice(ctx, reduced)
 		}
 	})
@@ -83,7 +83,7 @@ func BenchmarkFastVsCore_Fused(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
-			mapped := fused.Apply(ctx, stream)
+			mapped := fused.Apply(stream)
 			_, _ = core.Slice(ctx, mapped)
 		}
 	})
@@ -97,7 +97,7 @@ func BenchmarkFastVsCore_Fused(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
-			mapped := fused.Apply(ctx, stream)
+			mapped := fused.Apply(stream)
 			_ = fast.Slice(ctx, mapped)
 		}
 	})
@@ -112,11 +112,11 @@ func BenchmarkFastVsCore_LongChain(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
-			s1 := core.Map(func(x int) (int, error) { return x + 1, nil }).Apply(ctx, stream)
-			s2 := filter.Where(isEven).Apply(ctx, s1)
-			s3 := core.Map(func(x int) (int, error) { return x * 2, nil }).Apply(ctx, s2)
-			s4 := filter.Take[int](1000).Apply(ctx, s3)
-			s5 := core.Map(func(x int) (int, error) { return x - 1, nil }).Apply(ctx, s4)
+			s1 := core.Map(func(x int) (int, error) { return x + 1, nil }).Apply(stream)
+			s2 := filter.Where(isEven).Apply(s1)
+			s3 := core.Map(func(x int) (int, error) { return x * 2, nil }).Apply(s2)
+			s4 := filter.Take[int](1000).Apply(s3)
+			s5 := core.Map(func(x int) (int, error) { return x - 1, nil }).Apply(s4)
 			_, _ = core.Slice(ctx, s5)
 		}
 	})
@@ -126,11 +126,11 @@ func BenchmarkFastVsCore_LongChain(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
-			s1 := fast.Map(func(x int) int { return x + 1 }).Apply(ctx, stream)
-			s2 := fast.Filter(isEven).Apply(ctx, s1)
-			s3 := fast.Map(func(x int) int { return x * 2 }).Apply(ctx, s2)
-			s4 := fast.Take[int](1000).Apply(ctx, s3)
-			s5 := fast.Map(func(x int) int { return x - 1 }).Apply(ctx, s4)
+			s1 := fast.Map(func(x int) int { return x + 1 }).Apply(stream)
+			s2 := fast.Filter(isEven).Apply(s1)
+			s3 := fast.Map(func(x int) int { return x * 2 }).Apply(s2)
+			s4 := fast.Take[int](1000).Apply(s3)
+			s5 := fast.Map(func(x int) int { return x - 1 }).Apply(s4)
 			_ = fast.Slice(ctx, s5)
 		}
 	})
@@ -173,7 +173,7 @@ func BenchmarkOverhead_PanicRecovery(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
-			mapped := mapper.Apply(ctx, stream)
+			mapped := mapper.Apply(stream)
 			_ = fast.Slice(ctx, mapped)
 		}
 	})
@@ -184,7 +184,7 @@ func BenchmarkOverhead_PanicRecovery(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
-			mapped := mapper.Apply(ctx, stream)
+			mapped := mapper.Apply(stream)
 			_, _ = core.Slice(ctx, mapped)
 		}
 	})
@@ -199,7 +199,7 @@ func BenchmarkOverhead_ErrorSignature(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := fast.FromSlice(data)
-			mapped := fast.Map(square).Apply(ctx, stream)
+			mapped := fast.Map(square).Apply(stream)
 			_ = fast.Slice(ctx, mapped)
 		}
 	})
@@ -209,7 +209,7 @@ func BenchmarkOverhead_ErrorSignature(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			stream := flow.FromSlice(data)
-			mapped := core.Map(squareWithErr).Apply(ctx, stream)
+			mapped := core.Map(squareWithErr).Apply(stream)
 			_, _ = core.Slice(ctx, mapped)
 		}
 	})

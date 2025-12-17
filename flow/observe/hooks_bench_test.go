@@ -46,7 +46,7 @@ func BenchmarkMapperNoObservation(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		stream := fromSlice(benchmarkData(1000))
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		_, _ = core.Slice(ctx, result)
 	}
 }
@@ -66,7 +66,7 @@ func BenchmarkMapperWithHooks(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		stream := fromSlice(benchmarkData(1000))
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		_, _ = core.Slice(ctx, result)
 	}
 }
@@ -98,7 +98,7 @@ func BenchmarkMapperWithMultipleHooks(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		stream := fromSlice(benchmarkData(1000))
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		_, _ = core.Slice(ctx, result)
 	}
 }
@@ -118,7 +118,7 @@ func BenchmarkFlatMapperWithHooks(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		stream := fromSlice(benchmarkData(500))
-		result := flatMapper.Apply(ctx, stream)
+		result := flatMapper.Apply(stream)
 		_, _ = core.Slice(ctx, result)
 	}
 }
@@ -145,7 +145,7 @@ func BenchmarkMapperWithAllHookTypes(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		stream := fromSlice(benchmarkData(1000))
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		_, _ = core.Slice(ctx, result)
 	}
 }
@@ -167,7 +167,7 @@ func BenchmarkMapperWithSafeHooks(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		stream := fromSlice(benchmarkData(1000))
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		_, _ = core.Slice(ctx, result)
 	}
 }

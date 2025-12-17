@@ -18,12 +18,12 @@ func main() {
 	// Filter to keep only even numbers
 	evens := filter.Where(func(n int) bool {
 		return n%2 == 0
-	}).Apply(ctx, numbers)
+	}).Apply(numbers)
 
 	// Double each number
 	doubled := flow.Map(func(n int) (int, error) {
 		return n * 2, nil
-	}).Apply(ctx, evens)
+	}).Apply(evens)
 
 	// Collect all results into a slice (function style)
 	results, err := flow.Slice(ctx, doubled)
@@ -39,7 +39,7 @@ func main() {
 			return n * 2, nil
 		}
 		return n, nil
-	}).Apply(ctx, numbers2)
+	}).Apply(numbers2)
 
 	// ToSlice() returns a Sink; From() consumes the stream
 	results2, _ := flow.ToSlice[int]().From(ctx, pipeline)
@@ -47,8 +47,8 @@ func main() {
 
 	// Example with chained transformers
 	numbers3 := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	filtered := filter.Where(func(n int) bool { return n > 5 }).Apply(ctx, numbers3)
-	taken := filter.Take[int](3).Apply(ctx, filtered)
+	filtered := filter.Where(func(n int) bool { return n > 5 }).Apply(numbers3)
+	taken := filter.Take[int](3).Apply(filtered)
 
 	// Get first value using Sink
 	first, _ := flow.ToFirst[int]().From(ctx, taken)
@@ -59,7 +59,7 @@ func main() {
 	defer cancel()
 
 	ticker := flow.Interval(100 * time.Millisecond)
-	limited := filter.Take[int](3).Apply(ctx2, ticker)
+	limited := filter.Take[int](3).Apply(ticker)
 	ticks, _ := flow.ToSlice[int]().From(ctx2, limited)
 	fmt.Println("Ticks received:", ticks)
 }

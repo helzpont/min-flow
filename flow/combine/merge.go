@@ -687,7 +687,7 @@ func Fork[IN, OUT any](stream core.Stream[IN], transformers ...core.Transformer[
 	// Apply each transformer to its corresponding input
 	outputs := make([]core.Stream[OUT], n)
 	for i, t := range transformers {
-		outputs[i] = t.Apply(context.Background(), inputs[i])
+		outputs[i] = t.Apply(inputs[i])
 	}
 
 	return outputs

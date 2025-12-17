@@ -33,7 +33,7 @@ func counterExample() {
 
 	// Apply a mapper to trigger hooks
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	mapped := mapper.Apply(ctx, numbers)
+	mapped := mapper.Apply(numbers)
 
 	// Process the stream
 	sum := 0
@@ -78,7 +78,7 @@ func callbackExample() {
 	// Process stream
 	numbers := flow.FromSlice([]int{10, 20, 30, 40, 50})
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	mapped := mapper.Apply(ctx, numbers)
+	mapped := mapper.Apply(numbers)
 
 	for range mapped.All(ctx) {
 	}
@@ -101,7 +101,7 @@ func loggingExample() {
 	// Process stream
 	numbers := flow.FromSlice([]int{1, 2, 3})
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	mapped := mapper.Apply(ctx, numbers)
+	mapped := mapper.Apply(numbers)
 
 	results := []int{}
 	for res := range mapped.All(ctx) {

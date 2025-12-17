@@ -9,7 +9,7 @@ import (
 func Through[IN, MID, OUT any](t1 Transformer[IN, MID], t2 Transformer[MID, OUT]) Transformer[IN, OUT] {
 	return Transmit(func(ctx context.Context, in <-chan Result[IN]) <-chan Result[OUT] {
 		inStream := Emit(func(_ context.Context) <-chan Result[IN] { return in })
-		return t2.Apply(ctx, t1.Apply(ctx, inStream)).Emit(ctx)
+		return t2.Apply(t1.Apply(inStream)).Emit(ctx)
 	})
 }
 
@@ -20,7 +20,7 @@ func Chain[T any](transformers ...Transformer[T, T]) Transformer[T, T] {
 	return Transmit(func(ctx context.Context, in <-chan Result[T]) <-chan Result[T] {
 		var result Stream[T] = Emit(func(_ context.Context) <-chan Result[T] { return in })
 		for _, t := range transformers {
-			result = t.Apply(ctx, result)
+			result = t.Apply(result)
 		}
 		return result.Emit(ctx)
 	})
@@ -31,13 +31,13 @@ func Chain[T any](transformers ...Transformer[T, T]) Transformer[T, T] {
 func Pipe[T any](ctx context.Context, source Stream[T], transformers ...Transformer[T, T]) Stream[T] {
 	result := source
 	for _, t := range transformers {
-		result = t.Apply(ctx, result)
+		result = t.Apply(result)
 	}
 	return result
 }
 
 // Apply is a helper to apply a single transformer to a stream.
-// Equivalent to transformer.Apply(ctx, stream) but reads left-to-right.
+// Equivalent to transformer.Apply(stream) but reads left-to-right.
 func Apply[IN, OUT any](ctx context.Context, stream Stream[IN], transformer Transformer[IN, OUT]) Stream[OUT] {
-	return transformer.Apply(ctx, stream)
+	return transformer.Apply(stream)
 }

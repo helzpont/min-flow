@@ -46,7 +46,7 @@ func TestBatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			batched := aggregate.Batch[int](tt.size).Apply(ctx, stream)
+			batched := aggregate.Batch[int](tt.size).Apply(stream)
 			got, err := flow.Slice[[]int](ctx, batched)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -81,7 +81,7 @@ func TestBatchPanicsOnInvalidSize(t *testing.T) {
 	}()
 
 	// Apply creates the stream, but we need to read from it to trigger the panic
-	result := aggregate.Batch[int](0).Apply(ctx, stream)
+	result := aggregate.Batch[int](0).Apply(stream)
 	// Reading from the stream triggers the transmitter function which panics
 	for range result.All(ctx) {
 	}
@@ -92,7 +92,7 @@ func TestBatchTimeout(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 
 	// With a long timeout, should behave like regular Batch
-	batched := aggregate.BatchTimeout[int](2, 10*time.Second).Apply(ctx, stream)
+	batched := aggregate.BatchTimeout[int](2, 10*time.Second).Apply(stream)
 	got, err := flow.Slice[[]int](ctx, batched)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -117,7 +117,7 @@ func TestBatchTimeoutPanicsOnInvalidSize(t *testing.T) {
 	}()
 
 	// Apply creates the stream, but we need to read from it to trigger the panic
-	result := aggregate.BatchTimeout[int](0, time.Second).Apply(ctx, stream)
+	result := aggregate.BatchTimeout[int](0, time.Second).Apply(stream)
 	// Reading from the stream triggers the transmitter function which panics
 	for range result.All(ctx) {
 	}
@@ -126,7 +126,7 @@ func TestBatchTimeoutPanicsOnInvalidSize(t *testing.T) {
 func TestChunk(t *testing.T) {
 	ctx := context.Background()
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-	chunked := aggregate.Chunk[int](2).Apply(ctx, stream)
+	chunked := aggregate.Chunk[int](2).Apply(stream)
 
 	got, err := flow.Slice[[]int](ctx, chunked)
 	if err != nil {
@@ -188,7 +188,7 @@ func TestWindow(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			windowed := aggregate.Window[int](tt.size, tt.step).Apply(ctx, stream)
+			windowed := aggregate.Window[int](tt.size, tt.step).Apply(stream)
 			got, err := flow.Slice[[]int](ctx, windowed)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -237,7 +237,7 @@ func TestPartition(t *testing.T) {
 	// Partition into even and odd
 	partitioned := aggregate.Partition(func(n int) bool {
 		return n%2 == 0
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[[2][]int](ctx, partitioned)
 	if err != nil {
@@ -269,7 +269,7 @@ func TestGroupBy(t *testing.T) {
 	// Group by first letter
 	grouped := aggregate.GroupBy(func(s string) byte {
 		return s[0]
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[map[byte][]string](ctx, grouped)
 	if err != nil {
@@ -298,7 +298,7 @@ func TestBatchContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-	batched := aggregate.Batch[int](2).Apply(ctx, stream)
+	batched := aggregate.Batch[int](2).Apply(stream)
 
 	got, _ := flow.Slice[[]int](ctx, batched)
 	// Should get empty or partial result due to cancellation

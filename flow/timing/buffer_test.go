@@ -43,7 +43,7 @@ func TestBuffer(t *testing.T) {
 			stream := flow.FromSlice(tt.input)
 
 			// Buffer is a Transformer, so we apply it to the stream with context
-			buffered := timing.Buffer[int](tt.size).Apply(ctx, stream)
+			buffered := timing.Buffer[int](tt.size).Apply(stream)
 			result, err := flow.Slice(ctx, buffered)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -72,7 +72,7 @@ func TestDebounce(t *testing.T) {
 	})
 
 	// Debounce with a 20ms window - Debounce is a Transformer
-	debounced := timing.Debounce[int](20*time.Millisecond).Apply(ctx, stream)
+	debounced := timing.Debounce[int](20*time.Millisecond).Apply(stream)
 
 	startTime := time.Now()
 	result, err := flow.Slice(ctx, debounced)
@@ -107,7 +107,7 @@ func TestThrottle(t *testing.T) {
 	})
 
 	// Throttle to one item per 10ms - Throttle is a Transformer
-	throttled := timing.Throttle[int](10*time.Millisecond).Apply(ctx, stream)
+	throttled := timing.Throttle[int](10*time.Millisecond).Apply(stream)
 
 	result, err := flow.Slice(ctx, throttled)
 
@@ -135,7 +135,7 @@ func TestThrottleLatest(t *testing.T) {
 	})
 
 	// ThrottleLatest is a Transformer
-	throttled := timing.ThrottleLatest[int](10*time.Millisecond).Apply(ctx, stream)
+	throttled := timing.ThrottleLatest[int](10*time.Millisecond).Apply(stream)
 
 	result, err := flow.Slice(ctx, throttled)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestRateLimit(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 
 	// Rate limit to 2 per 50ms - RateLimit is a Transformer
-	limited := timing.RateLimit[int](2, 50*time.Millisecond).Apply(ctx, stream)
+	limited := timing.RateLimit[int](2, 50*time.Millisecond).Apply(stream)
 
 	startTime := time.Now()
 	result, err := flow.Slice(ctx, limited)
@@ -181,7 +181,7 @@ func TestDelay(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3})
 
 	// Delay is a Transformer
-	delayed := timing.Delay[int](20*time.Millisecond).Apply(ctx, stream)
+	delayed := timing.Delay[int](20*time.Millisecond).Apply(stream)
 
 	startTime := time.Now()
 	result, err := flow.Slice(ctx, delayed)
@@ -217,7 +217,7 @@ func TestSample(t *testing.T) {
 	})
 
 	// Sample every 30ms - Sample is a Transformer
-	sampled := timing.Sample[int](30*time.Millisecond).Apply(ctx, stream)
+	sampled := timing.Sample[int](30*time.Millisecond).Apply(stream)
 
 	result, err := flow.Slice(ctx, sampled)
 	if err != nil {
@@ -266,7 +266,7 @@ func TestTimeout(t *testing.T) {
 			})
 
 			// Timeout is a Transformer
-			timedOut := timing.After[int](tt.timeout).Apply(ctx, stream)
+			timedOut := timing.After[int](tt.timeout).Apply(stream)
 
 			result, err := flow.Slice(ctx, timedOut)
 
@@ -292,7 +292,7 @@ func TestBuffer_ContextCancellation(t *testing.T) {
 	defer cancel()
 
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	buffered := timing.Buffer[int](2).Apply(ctx, stream)
+	buffered := timing.Buffer[int](2).Apply(stream)
 
 	count := 0
 	for result := range buffered.Emit(ctx) {

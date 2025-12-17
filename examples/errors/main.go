@@ -21,7 +21,7 @@ func main() {
 			return 0, errors.New("cannot divide by zero")
 		}
 		return 100 / n, nil
-	}).Apply(ctx, numbers)
+	}).Apply(numbers)
 
 	// Collect results - includes errors
 	fmt.Println("Processing with errors:")
@@ -42,7 +42,7 @@ func main() {
 			return 0, errors.New("zero!")
 		}
 		return n, nil
-	}).Apply(ctx, numbers2)
+	}).Apply(numbers2)
 
 	// CatchError handles errors matching a predicate with a handler that provides fallback values
 	handled := flowerrors.CatchError(
@@ -52,10 +52,10 @@ func main() {
 			fmt.Printf("Handled error: %v\n", err)
 			return 0, nil // return fallback value (0) and nil to not propagate error
 		},
-	).Apply(ctx, mapped2)
+	).Apply(mapped2)
 
 	// IgnoreErrors filters out any remaining errors
-	filtered := flowerrors.IgnoreErrors[int]().Apply(ctx, handled)
+	filtered := flowerrors.IgnoreErrors[int]().Apply(handled)
 	results, _ := flow.Slice(ctx, filtered)
 	fmt.Printf("Valid results: %v (errors handled: %d)\n", results, errCount)
 
@@ -66,11 +66,11 @@ func main() {
 			return 0, errors.New("original error")
 		}
 		return n, nil
-	}).Apply(ctx, numbers3)
+	}).Apply(numbers3)
 
 	mapped := flowerrors.MapErrors[int](func(err error) error {
 		return fmt.Errorf("transformed: %w", err)
-	}).Apply(ctx, mapped3)
+	}).Apply(mapped3)
 
 	fmt.Println("\nWith transformed errors:")
 	for res := range mapped.Emit(ctx) {

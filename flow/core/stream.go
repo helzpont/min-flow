@@ -47,5 +47,5 @@ func All[OUT any](ctx context.Context, stream Stream[OUT]) iter.Seq[Result[OUT]]
 // be composed to build complex data processing pipelines.
 // They answer the question: "What operations are being applied to the stream's data?".
 type Transformer[IN, OUT any] interface {
-	Apply(context.Context, Stream[IN]) Stream[OUT]
+	Apply(Stream[IN]) Stream[OUT]
 }

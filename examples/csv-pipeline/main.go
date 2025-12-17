@@ -50,9 +50,9 @@ Charlie,35,Chicago
 	// 3. Encode back to CSV bytes
 	// 4. Write to output
 	byteStream := io.FromReader(reader, 1024)
-	records := csv.DecodeCSV().Apply(ctx, byteStream)
-	encoded := csv.EncodeCSV().Apply(ctx, records)
-	result := io.ToWriter(&output).Apply(ctx, encoded)
+	records := csv.DecodeCSV().Apply(byteStream)
+	encoded := csv.EncodeCSV().Apply(records)
+	result := io.ToWriter(&output).Apply(encoded)
 
 	// Execute the pipeline
 	for res := range result.Emit(ctx) {
@@ -85,7 +85,7 @@ Gizmo,8,14.99
 
 	// Build the pipeline with transformation
 	byteStream := io.FromReader(reader, 1024)
-	records := csv.DecodeCSV().Apply(ctx, byteStream)
+	records := csv.DecodeCSV().Apply(byteStream)
 
 	// Transform: Add a "total" column (quantity * price)
 	transformed := flow.Map(func(record []string) ([]string, error) {
@@ -103,10 +103,10 @@ Gizmo,8,14.99
 		total := float64(qty) * price
 
 		return append(record, fmt.Sprintf("%.2f", total)), nil
-	}).Apply(ctx, records)
+	}).Apply(records)
 
-	encoded := csv.EncodeCSV().Apply(ctx, transformed)
-	result := io.ToWriter(&output).Apply(ctx, encoded)
+	encoded := csv.EncodeCSV().Apply(transformed)
+	result := io.ToWriter(&output).Apply(encoded)
 
 	// Execute the pipeline
 	for res := range result.Emit(ctx) {
@@ -141,20 +141,20 @@ Eve,Engineering,90000
 
 	// Build the pipeline
 	byteStream := io.FromReader(reader, 1024)
-	records := csv.DecodeCSV().Apply(ctx, byteStream)
+	records := csv.DecodeCSV().Apply(byteStream)
 
 	// Skip header and filter to only Engineering department
-	skipped := csv.SkipHeader().Apply(ctx, records)
+	skipped := csv.SkipHeader().Apply(records)
 	filtered := filter.Where(func(record []string) bool {
 		return len(record) >= 2 && record[1] == "Engineering"
-	}).Apply(ctx, skipped)
+	}).Apply(skipped)
 
 	// Add header back using Concat to prepend
 	header := flow.Once([]string{"name", "department", "salary"})
 	withHeader := combine.Concat(header, filtered)
 
-	encoded := csv.EncodeCSV().Apply(ctx, withHeader)
-	result := io.ToWriter(&output).Apply(ctx, encoded)
+	encoded := csv.EncodeCSV().Apply(withHeader)
+	result := io.ToWriter(&output).Apply(encoded)
 
 	// Execute and collect for aggregate calculation
 	var total int

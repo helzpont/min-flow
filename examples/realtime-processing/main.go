@@ -52,7 +52,7 @@ func batchingExample() {
 	readings := flow.Range(1, 20)
 
 	// Batch into groups of 5
-	batched := aggregate.Batch[int](5).Apply(ctx, readings)
+	batched := aggregate.Batch[int](5).Apply(readings)
 
 	// Process each batch
 	fmt.Println("Processing in batches of 5:")
@@ -106,7 +106,7 @@ func windowingExample() {
 
 	// Aggregate using tumbling windows of 500ms
 	// We use BatchTimeout to collect readings within a time window
-	windowed := aggregate.BatchTimeout[SensorReading](100, 500*time.Millisecond).Apply(ctx, values)
+	windowed := aggregate.BatchTimeout[SensorReading](100, 500*time.Millisecond).Apply(values)
 
 	// Compute stats for each window
 	stats := flow.Map(func(batch []SensorReading) (WindowStats, error) {
@@ -131,7 +131,7 @@ func windowingExample() {
 		}
 		stats.Avg = stats.Sum / float64(stats.Count)
 		return stats, nil
-	}).Apply(ctx, windowed)
+	}).Apply(windowed)
 
 	fmt.Println("Time-windowed statistics (500ms windows):")
 	for res := range stats.All(ctx) {
@@ -222,7 +222,7 @@ func throttlingExample() {
 	})
 
 	// Throttle: only emit one item per 200ms
-	throttled := timing.Throttle[int](200*time.Millisecond).Apply(ctx, fast)
+	throttled := timing.Throttle[int](200 * time.Millisecond).Apply(fast)
 
 	fmt.Println("Throttled output (max 1 per 200ms):")
 	var values []int
@@ -236,7 +236,7 @@ func throttlingExample() {
 	// Sampling example: take every 3rd item
 	fmt.Println("\nSampled output (every 3rd item):")
 	numbers := flow.Range(1, 20)
-	sampled := filter.TakeEvery[int](3).Apply(context.Background(), numbers)
+	sampled := filter.TakeEvery[int](3).Apply(numbers)
 
 	sampledVals, _ := flow.Slice(context.Background(), sampled)
 	fmt.Printf("  Sampled values: %v\n", sampledVals)

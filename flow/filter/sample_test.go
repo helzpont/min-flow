@@ -47,7 +47,7 @@ func TestSampleWith(t *testing.T) {
 		return out
 	})
 
-	result := filter.SampleWith[int, int](sampler).Apply(ctx, source)
+	result := filter.SampleWith[int, int](sampler).Apply(source)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -94,7 +94,7 @@ func TestSampleWithPreservesErrors(t *testing.T) {
 		return out
 	})
 
-	result := filter.SampleWith[int, int](sampler).Apply(ctx, source)
+	result := filter.SampleWith[int, int](sampler).Apply(source)
 
 	var values []int
 	var errCount int
@@ -130,7 +130,7 @@ func TestAuditTime(t *testing.T) {
 	}()
 
 	stream := flow.FromChannel(ch)
-	result := filter.AuditTime[int](50*time.Millisecond).Apply(ctx, stream)
+	result := filter.AuditTime[int](50*time.Millisecond).Apply(stream)
 	got, _ := flow.Slice(ctx, result)
 
 	// Should emit the most recent value periodically
@@ -157,7 +157,7 @@ func TestThrottleLast(t *testing.T) {
 	}()
 
 	stream := flow.FromChannel(ch)
-	result := filter.ThrottleLast[int](50*time.Millisecond).Apply(ctx, stream)
+	result := filter.ThrottleLast[int](50*time.Millisecond).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -208,7 +208,7 @@ func TestDistinctUntilChanged(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 
-			result := filter.DistinctUntilChanged[int]().Apply(ctx, stream)
+			result := filter.DistinctUntilChanged[int]().Apply(stream)
 			got, err := flow.Slice(ctx, result)
 
 			if err != nil {
@@ -249,7 +249,7 @@ func TestDistinctUntilChangedBy(t *testing.T) {
 	// Compare by age
 	keyFn := func(p Person) int { return p.Age }
 
-	result := filter.DistinctUntilChangedBy(keyFn).Apply(ctx, stream)
+	result := filter.DistinctUntilChangedBy(keyFn).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -285,7 +285,7 @@ func TestDistinctUntilChangedWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := filter.DistinctUntilChanged[int]().Apply(ctx, emitter)
+	result := filter.DistinctUntilChanged[int]().Apply(emitter)
 
 	var values []int
 	var errCount int
@@ -312,7 +312,7 @@ func TestRandomSample(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
 	// Sample 50%
-	result := filter.RandomSample[int](0.5).Apply(ctx, stream)
+	result := filter.RandomSample[int](0.5).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -331,7 +331,7 @@ func TestRandomSampleEdgeCases(t *testing.T) {
 
 	t.Run("rate 0 takes nothing", func(t *testing.T) {
 		stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-		result := filter.RandomSample[int](0).Apply(ctx, stream)
+		result := filter.RandomSample[int](0).Apply(stream)
 		got, _ := flow.Slice(ctx, result)
 
 		if len(got) != 0 {
@@ -341,7 +341,7 @@ func TestRandomSampleEdgeCases(t *testing.T) {
 
 	t.Run("rate 1 takes everything", func(t *testing.T) {
 		stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-		result := filter.RandomSample[int](1.0).Apply(ctx, stream)
+		result := filter.RandomSample[int](1.0).Apply(stream)
 		got, _ := flow.Slice(ctx, result)
 
 		if len(got) != 5 {
@@ -355,7 +355,7 @@ func TestReservoirSample(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
 	// Sample 3 items
-	result := filter.ReservoirSample[int](3).Apply(ctx, stream)
+	result := filter.ReservoirSample[int](3).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -386,7 +386,7 @@ func TestReservoirSampleSmallInput(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2})
 
 	// Sample more than available
-	result := filter.ReservoirSample[int](5).Apply(ctx, stream)
+	result := filter.ReservoirSample[int](5).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -440,7 +440,7 @@ func TestEveryNth(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 
-			result := filter.EveryNth[int](tt.n).Apply(ctx, stream)
+			result := filter.EveryNth[int](tt.n).Apply(stream)
 			got, err := flow.Slice(ctx, result)
 
 			if err != nil {
@@ -466,7 +466,7 @@ func TestTakeEvery(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
 
 	// TakeEvery is alias for EveryNth
-	result := filter.TakeEvery[int](2).Apply(ctx, stream)
+	result := filter.TakeEvery[int](2).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -505,7 +505,7 @@ func TestEveryNthWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := filter.EveryNth[int](2).Apply(ctx, emitter)
+	result := filter.EveryNth[int](2).Apply(emitter)
 
 	var values []int
 	var errCount int
@@ -560,7 +560,7 @@ func TestSampleWithContextCancellation(t *testing.T) {
 		return out
 	})
 
-	result := filter.SampleWith[int, int](sampler).Apply(ctx, source)
+	result := filter.SampleWith[int, int](sampler).Apply(source)
 	outCh := result.Emit(ctx)
 
 	// Get a few items
@@ -605,7 +605,7 @@ func TestReservoirSampleWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := filter.ReservoirSample[int](3).Apply(ctx, emitter)
+	result := filter.ReservoirSample[int](3).Apply(emitter)
 
 	var slices [][]int
 	var errCount int
@@ -641,7 +641,7 @@ func TestThrottleLastWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := filter.ThrottleLast[int](50*time.Millisecond).Apply(ctx, emitter)
+	result := filter.ThrottleLast[int](50*time.Millisecond).Apply(emitter)
 
 	var values []int
 	var errCount int
@@ -681,7 +681,7 @@ func TestAuditTimeWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := filter.AuditTime[int](50*time.Millisecond).Apply(ctx, emitter)
+	result := filter.AuditTime[int](50*time.Millisecond).Apply(emitter)
 
 	var values []int
 	var errCount int

@@ -48,7 +48,7 @@ func TestWithHooks(t *testing.T) {
 		})
 
 		stream := fromSlice([]int{1, 2, 3})
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		values, err := Slice(ctx, result)
 
 		if err != nil {
@@ -89,7 +89,7 @@ func TestWithHooks(t *testing.T) {
 		})
 
 		stream := fromSlice([]int{1, 2, 3})
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		_, err := Slice(ctx, result)
 
 		if err == nil {
@@ -127,7 +127,7 @@ func TestWithHooks(t *testing.T) {
 
 		mapper := Map(func(v int) (int, error) { return v, nil })
 		stream := fromSlice([]int{1})
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		_, _ = Slice(ctx, result)
 
 		if len(order) != 3 {
@@ -146,7 +146,7 @@ func TestWithHooks(t *testing.T) {
 
 		mapper := Map(func(v int) (int, error) { return v, nil })
 		stream := fromSlice([]int{1, 2, 3})
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		values, err := Slice(ctx, result)
 
 		if err != nil {
@@ -172,7 +172,7 @@ func TestWithHooks(t *testing.T) {
 		})
 
 		stream := fromSlice([]int{1, 2, 3})
-		result := flatMapper.Apply(ctx, stream)
+		result := flatMapper.Apply(stream)
 		values, err := Slice(ctx, result)
 
 		if err != nil {
@@ -204,7 +204,7 @@ func TestSafeHooks(t *testing.T) {
 
 		mapper := Map(func(v int) (int, error) { return v, nil })
 		stream := fromSlice([]int{1, 2, 3})
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		values, err := Slice(ctx, result)
 
 		if err != nil {
@@ -231,7 +231,7 @@ func TestSafeHooks(t *testing.T) {
 
 		mapper := Map(func(v int) (int, error) { return v, nil })
 		stream := fromSlice([]int{1, 2, 3})
-		result := mapper.Apply(ctx, stream)
+		result := mapper.Apply(stream)
 		values, err := Slice(ctx, result)
 
 		if err != nil {
@@ -308,7 +308,7 @@ func TestContextCancellationWithHooks(t *testing.T) {
 	})
 
 	stream := fromSlice([]int{1, 2, 3, 4, 5})
-	result := mapper.Apply(ctx, stream)
+	result := mapper.Apply(stream)
 	_, _ = Slice(ctx, result)
 
 	// OnComplete should still be called even after cancellation
@@ -338,13 +338,13 @@ func TestMultipleHookTypes(t *testing.T) {
 	// Test int mapper
 	intMapper := Map(func(v int) (int, error) { return v, nil })
 	intStream := fromSlice([]int{1})
-	intResult := intMapper.Apply(ctx, intStream)
+	intResult := intMapper.Apply(intStream)
 	_, _ = Slice(ctx, intResult)
 
 	// Test string mapper
 	stringMapper := Map(func(v string) (string, error) { return v, nil })
 	stringStream := fromSlice([]string{"hello"})
-	stringResult := stringMapper.Apply(ctx, stringStream)
+	stringResult := stringMapper.Apply(stringStream)
 	_, _ = Slice(ctx, stringResult)
 
 	if !intHookCalled.Load() {

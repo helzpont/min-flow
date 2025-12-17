@@ -33,7 +33,7 @@ func benchmarkMapMinFlow(b *testing.B, size int) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(ctx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(ctx, mapped)
 	}
 }
@@ -158,7 +158,7 @@ func benchmarkFilterMinFlow(b *testing.B, size int) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		filtered := filter.Where(isEven).Apply(ctx, stream)
+		filtered := filter.Where(isEven).Apply(stream)
 		_, _ = core.Slice(ctx, filtered)
 	}
 }

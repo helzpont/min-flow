@@ -25,7 +25,7 @@ func TestThrottleWithTrailing(t *testing.T) {
 		}()
 
 		stream := flow.FromChannel(ch)
-		result := timing.ThrottleWithTrailing[int](50*time.Millisecond).Apply(ctx, stream)
+		result := timing.ThrottleWithTrailing[int](50*time.Millisecond).Apply(stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -45,7 +45,7 @@ func TestThrottleWithTrailing(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 3})
 
-		result := timing.ThrottleWithTrailing[int](1*time.Second).Apply(ctx, stream)
+		result := timing.ThrottleWithTrailing[int](1*time.Second).Apply(stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -71,7 +71,7 @@ func TestTimeoutWithError(t *testing.T) {
 		}()
 
 		stream := flow.FromChannel(ch)
-		result := timing.AfterWithError[int](50*time.Millisecond, customErr).Apply(ctx, stream)
+		result := timing.AfterWithError[int](50*time.Millisecond, customErr).Apply(stream)
 		_, err := flow.Slice(ctx, result)
 
 		if !errors.Is(err, customErr) {
@@ -84,7 +84,7 @@ func TestTimeoutWithError(t *testing.T) {
 		customErr := errors.New("custom timeout")
 		stream := flow.FromSlice([]int{1, 2, 3})
 
-		result := timing.AfterWithError[int](1*time.Second, customErr).Apply(ctx, stream)
+		result := timing.AfterWithError[int](1*time.Second, customErr).Apply(stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -210,7 +210,7 @@ func TestTimestamp(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3})
 
 	start := time.Now()
-	result := timing.Stamped[int]().Apply(ctx, stream)
+	result := timing.Stamped[int]().Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -246,7 +246,7 @@ func TestTimestampPassesErrors(t *testing.T) {
 		return out
 	})
 
-	result := timing.Stamped[int]().Apply(ctx, emitter)
+	result := timing.Stamped[int]().Apply(emitter)
 
 	var values []int
 	var gotErr error
@@ -282,7 +282,7 @@ func TestTimeIntervalOp(t *testing.T) {
 	}()
 
 	stream := flow.FromChannel(ch)
-	result := timing.Elapsed[int]().Apply(ctx, stream)
+	result := timing.Elapsed[int]().Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -310,7 +310,7 @@ func TestDelayWhen(t *testing.T) {
 	}
 
 	start := time.Now()
-	result := timing.DelayWhen(delayFn).Apply(ctx, stream)
+	result := timing.DelayWhen(delayFn).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 	elapsed := time.Since(start)
 
@@ -353,7 +353,7 @@ func TestDelayWhenPassesErrors(t *testing.T) {
 		return 10 * time.Millisecond
 	}
 
-	result := timing.DelayWhen(delayFn).Apply(ctx, emitter)
+	result := timing.DelayWhen(delayFn).Apply(emitter)
 
 	var values []int
 	var errCount int
@@ -383,7 +383,7 @@ func TestDelayWhenCancellation(t *testing.T) {
 		return 100 * time.Millisecond
 	}
 
-	result := timing.DelayWhen(delayFn).Apply(ctx, stream)
+	result := timing.DelayWhen(delayFn).Apply(stream)
 	ch := result.Emit(ctx)
 
 	// Get first item

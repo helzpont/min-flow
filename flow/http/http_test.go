@@ -100,7 +100,7 @@ func TestGetEach(t *testing.T) {
 		close(out)
 		return out
 	})
-	output := GetEach(http.DefaultClient).Apply(ctx, input)
+	output := GetEach(http.DefaultClient).Apply(input)
 	var responses []Response
 	for res := range output.Emit(ctx) {
 		if res.IsError() {

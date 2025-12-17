@@ -55,7 +55,7 @@ func TestParallel(t *testing.T) {
 			stream := flow.FromSlice(tt.input)
 			doubled := parallel.Map(tt.workers, func(n int) int {
 				return n * 2
-			}).Apply(ctx, stream)
+			}).Apply(stream)
 
 			got, err := flow.Slice[int](ctx, doubled)
 			if err != nil {
@@ -86,7 +86,7 @@ func TestParallelOrdered(t *testing.T) {
 		// Add some jitter to test ordering
 		time.Sleep(time.Duration(n%3) * time.Millisecond)
 		return n * 2
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, doubled)
 	if err != nil {
@@ -115,7 +115,7 @@ func TestParallelFlatMap(t *testing.T) {
 			result[i] = n
 		}
 		return result
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, expanded)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestParallelContextCancellation(t *testing.T) {
 		atomic.AddInt32(&processed, 1)
 		time.Sleep(50 * time.Millisecond)
 		return n * 2
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	// Cancel after a short delay
 	go func() {
@@ -172,7 +172,7 @@ func TestParallelPanicRecovery(t *testing.T) {
 			panic("intentional panic")
 		}
 		return n * 2
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	// Collect all results including errors
 	var values []int
@@ -203,7 +203,7 @@ func TestAsyncMap(t *testing.T) {
 	doubled := parallel.AsyncMap(func(ctx context.Context, n int) (int, error) {
 		time.Sleep(time.Duration(n) * time.Millisecond)
 		return n * 2, nil
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, doubled)
 	if err != nil {
@@ -232,7 +232,7 @@ func TestAsyncMapOrdered(t *testing.T) {
 		// Add jitter - items processed out of natural order
 		time.Sleep(time.Duration(5-n) * time.Millisecond)
 		return n * 2, nil
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, doubled)
 	if err != nil {
