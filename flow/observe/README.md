@@ -7,6 +7,7 @@ The `observe` package provides typed hooks for monitoring, debugging, and collec
 Observability is crucial for understanding stream behavior in production. This package provides **typed hooks** that attach to context and fire automatically during stream processing.
 
 Key benefits:
+
 - **Type-safe**: Hooks are parameterized by stream element type
 - **Zero pipeline overhead**: Hooks don't add stages to your stream
 - **Context-based**: Attach hooks to context, they propagate automatically
@@ -30,7 +31,7 @@ graph LR
 import (
     "context"
     "fmt"
-    
+
     "github.com/lguimbarda/min-flow/flow"
     "github.com/lguimbarda/min-flow/flow/observe"
 )
@@ -198,14 +199,14 @@ ctx = flowerrors.WithCircuitBreakerMonitor[int](ctx, 5, func() {
 
 ## When to Use Which Hook
 
-| Hook                              | Use Case                           |
-| --------------------------------- | ---------------------------------- |
-| `WithValueHook`                   | Debug logging, custom metrics      |
-| `WithErrorHook`                   | Error logging, alerting            |
-| `WithCounter`                     | Simple throughput counting         |
-| `WithValueCounter`                | Conditional counting               |
-| `WithLogging`                     | Development debugging              |
-| `flowerrors.WithErrorCollector`   | Batch error analysis               |
+| Hook                                   | Use Case                         |
+| -------------------------------------- | -------------------------------- |
+| `WithValueHook`                        | Debug logging, custom metrics    |
+| `WithErrorHook`                        | Error logging, alerting          |
+| `WithCounter`                          | Simple throughput counting       |
+| `WithValueCounter`                     | Conditional counting             |
+| `WithLogging`                          | Development debugging            |
+| `flowerrors.WithErrorCollector`        | Batch error analysis             |
 | `flowerrors.WithCircuitBreakerMonitor` | Production error rate monitoring |
 
 ## Performance Considerations
