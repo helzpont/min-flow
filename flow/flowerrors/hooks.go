@@ -117,10 +117,10 @@ func OnErrorDo[T any](ctx context.Context, handler func(error)) context.Context 
 // CircuitBreakerMonitor monitors error rates and trips when a threshold is reached.
 // For a full circuit breaker implementation with retry logic, see CircuitBreaker in resilience.go.
 type CircuitBreakerMonitor struct {
-	threshold       int
-	failureCount    atomic.Int64
-	isOpen          atomic.Bool
-	onThresholdHit  func()
+	threshold      int
+	failureCount   atomic.Int64
+	isOpen         atomic.Bool
+	onThresholdHit func()
 }
 
 // IsOpen returns true if the circuit breaker has tripped.
