@@ -46,12 +46,12 @@ func main() {
     // Filter even numbers
     evens := filter.Where(func(n int) bool {
         return n%2 == 0
-    }).Apply(ctx, stream)
+    }).Apply(stream)
 
     // Double them
     doubled := flow.Map(func(n int) (int, error) {
         return n * 2, nil
-    }).Apply(ctx, evens)
+    }).Apply(evens)
 
     // Collect results
     values, err := flow.Slice(ctx, doubled)
@@ -110,7 +110,7 @@ Transformers convert streams from one type to another:
 
 ```go
 // Apply a single transformer
-filtered := filter.Where(isEven).Apply(ctx, stream)
+filtered := filter.Where(isEven).Apply(stream)
 
 // Chain multiple transformers
 result := flow.Pipe(ctx, stream,
@@ -222,7 +222,7 @@ cb := flowerrors.NewCircuitBreaker(flowerrors.CircuitBreakerConfig{
     SuccessThreshold: 2,
     Timeout:          30 * time.Second,
 })
-protected := flowerrors.WithCircuitBreaker(cb, operation).Apply(ctx, stream)
+protected := flowerrors.WithCircuitBreaker(cb, operation).Apply(stream)
 
 // Timeout
 flowerrors.Timeout(duration, operation)
@@ -269,29 +269,29 @@ result := flow.Map(func(n int) (int, error) {
         return 0, errors.New("skip 2")
     }
     return n * 2, nil
-}).Apply(ctx, stream)
+}).Apply(stream)
 // Stream continues: Ok(2), Err("skip 2"), Ok(6)
 
 // Log errors without stopping
 logged := flowerrors.OnError(func(err error) {
     log.Printf("Error: %v", err)
-}).Apply(ctx, result)
+}).Apply(result)
 
 // Catch and recover from specific errors
 recovered := flowerrors.CatchError(
     func(err error) bool { return errors.Is(err, ErrNotFound) },
     func(err error) (int, error) { return 0, nil },  // Replace with default
-).Apply(ctx, result)
+).Apply(result)
 
 // Retry transient failures
-retried := flowerrors.Retry(3, fetchFromAPI).Apply(ctx, stream)
+retried := flowerrors.Retry(3, fetchFromAPI).Apply(stream)
 
 // With exponential backoff
 retried := flowerrors.RetryWithBackoff(
     3,
     flowerrors.ExponentialBackoff(100*time.Millisecond, 2.0),
     fetchFromAPI,
-).Apply(ctx, stream)
+).Apply(stream)
 ```
 
 ## Context and Cancellation
@@ -308,35 +308,76 @@ if errors.Is(err, context.DeadlineExceeded) {
 }
 ```
 
-## Delegate System
+## Stream Observation with Typed Hooks
 
-Extend functionality with the delegate registry:
+Observe stream processing with type-safe hooks attached to context:
 
 ```go
-// Create registry and add to context
-ctx, registry := core.WithRegistry(context.Background())
+import (
+    "github.com/lguimbarda/min-flow/flow"
+    "github.com/lguimbarda/min-flow/flow/core"
+    "github.com/lguimbarda/min-flow/flow/observe"
+    "github.com/lguimbarda/min-flow/flow/flowerrors"
+)
 
-// Register interceptors for cross-cutting concerns
-registry.Register(&MetricsInterceptor{})
-registry.Register(&LoggingInterceptor{})
+func main() {
+    ctx := context.Background()
 
-// Register configuration
-registry.Register(&parallel.ParallelConfig{Workers: 8})
-registry.Register(&aggregate.AggregateConfig{BatchSize: 100})
+    // Attach typed hooks to context
+    ctx, counter := observe.WithCounter[int](ctx)           // Count items
+    ctx = observe.WithValueHook(ctx, func(v int) {          // Observe values
+        fmt.Printf("Value: %d\n", v)
+    })
+    ctx = observe.WithErrorHook(ctx, func(err error) {      // Observe errors
+        log.Printf("Error: %v", err)
+    })
 
-// Interceptor example
-type MetricsInterceptor struct {
-    count atomic.Int64
+    // Process stream - hooks fire automatically during Emit()
+    stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
+    doubled := flow.Map(func(n int) (int, error) {
+        return n * 2, nil
+    }).Apply(stream)
+
+    _, _ = flow.Slice(ctx, doubled)
+    fmt.Printf("Processed %d items\n", counter.Load())
 }
+```
 
-func (m *MetricsInterceptor) Events() []core.Event {
-    return []core.Event{core.ValueReceived}
-}
+### Available Hooks
 
-func (m *MetricsInterceptor) Do(ctx context.Context, event core.Event, args ...any) error {
-    m.count.Add(1)
-    return nil
-}
+```go
+// Observation (observe package)
+observe.WithCounter[T](ctx)              // Count processed items
+observe.WithValueCounter[T](ctx, fn)     // Count values matching condition
+observe.WithValueHook[T](ctx, fn)        // Callback per value
+observe.WithErrorHook[T](ctx, fn)        // Callback per error
+observe.WithLogging[T](ctx, logFn)       // Log stream events
+
+// Error tracking (flowerrors package)
+flowerrors.WithErrorCounter[T](ctx, fn)     // Count errors
+flowerrors.WithErrorCollector[T](ctx)       // Collect all errors
+flowerrors.WithCircuitBreakerMonitor[T](ctx, threshold, fn)  // Monitor error rate
+
+// Low-level (core package)
+core.WithHooks(ctx, core.Hooks[T]{
+    OnValue:       func(v T) { ... },
+    OnError:       func(err error) { ... },
+    OnStreamStart: func() { ... },
+    OnStreamEnd:   func() { ... },
+})
+```
+
+### Hook Composition
+
+Multiple hooks of different types can coexist:
+
+```go
+ctx := context.Background()
+ctx, intCounter := observe.WithCounter[int](ctx)
+ctx, strCounter := observe.WithCounter[string](ctx)
+ctx, errCollector := flowerrors.WithErrorCollector[int](ctx)
+
+// All hooks fire during their respective stream processing
 ```
 
 ## Development

@@ -20,16 +20,13 @@ func testStreamFromSlice[T any](data []T) core.Stream[T] {
 	})
 }
 
-func TestOnValue(t *testing.T) {
-	ctx, registry := core.WithRegistry(context.Background())
+func TestWithValueHook(t *testing.T) {
+	ctx := context.Background()
 
-	var received []any
-	err := OnValue(registry, func(v any) {
+	var received []int
+	ctx = WithValueHook(ctx, func(v int) {
 		received = append(received, v)
 	})
-	if err != nil {
-		t.Fatalf("OnValue registration failed: %v", err)
-	}
 
 	// Create and process a stream
 	mapper := core.Map(func(x int) (int, error) {
@@ -44,18 +41,21 @@ func TestOnValue(t *testing.T) {
 	if len(received) != 3 {
 		t.Errorf("expected 3 values, got %d", len(received))
 	}
+	expected := []int{2, 4, 6}
+	for i, v := range received {
+		if v != expected[i] {
+			t.Errorf("received[%d] = %d, want %d", i, v, expected[i])
+		}
+	}
 }
 
-func TestOnError(t *testing.T) {
-	ctx, registry := core.WithRegistry(context.Background())
+func TestWithErrorHook(t *testing.T) {
+	ctx := context.Background()
 
 	var errors []error
-	err := OnError(registry, func(err error) {
+	ctx = WithErrorHook[int](ctx, func(err error) {
 		errors = append(errors, err)
 	})
-	if err != nil {
-		t.Fatalf("OnError registration failed: %v", err)
-	}
 
 	// Create a stream with errors
 	input := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
@@ -67,7 +67,7 @@ func TestOnError(t *testing.T) {
 		return ch
 	})
 
-	// Process through a mapper (which auto-invokes interceptors)
+	// Process through a mapper (which auto-invokes hooks)
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
 	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
@@ -77,24 +77,17 @@ func TestOnError(t *testing.T) {
 	}
 }
 
-func TestOnStartAndComplete(t *testing.T) {
-	ctx, registry := core.WithRegistry(context.Background())
+func TestWithStartAndCompleteHooks(t *testing.T) {
+	ctx := context.Background()
 
 	var startCalled, completeCalled atomic.Int32
 
-	err := OnStart(registry, func() {
+	ctx = WithStartHook[int](ctx, func() {
 		startCalled.Add(1)
 	})
-	if err != nil {
-		t.Fatalf("OnStart registration failed: %v", err)
-	}
-
-	err = OnComplete(registry, func() {
+	ctx = WithCompleteHook[int](ctx, func() {
 		completeCalled.Add(1)
 	})
-	if err != nil {
-		t.Fatalf("OnComplete registration failed: %v", err)
-	}
 
 	// Process a stream
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
@@ -111,12 +104,9 @@ func TestOnStartAndComplete(t *testing.T) {
 }
 
 func TestWithCounter(t *testing.T) {
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx := context.Background()
 
-	counter, err := WithCounter(registry)
-	if err != nil {
-		t.Fatalf("WithCounter failed: %v", err)
-	}
+	ctx, counter := WithCounter[int](ctx)
 
 	// Create a stream with mixed results
 	input := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
@@ -145,12 +135,9 @@ func TestWithCounter(t *testing.T) {
 }
 
 func TestWithValueCounter(t *testing.T) {
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx := context.Background()
 
-	counter, err := WithValueCounter(registry)
-	if err != nil {
-		t.Fatalf("WithValueCounter failed: %v", err)
-	}
+	ctx, counter := WithValueCounter[int](ctx)
 
 	mapper := core.Map(func(x int) (int, error) { return x * 2, nil })
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
@@ -163,12 +150,9 @@ func TestWithValueCounter(t *testing.T) {
 }
 
 func TestWithErrorCollector(t *testing.T) {
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx := context.Background()
 
-	collector, err := WithErrorCollector(registry)
-	if err != nil {
-		t.Fatalf("WithErrorCollector failed: %v", err)
-	}
+	ctx, collector := WithErrorCollector[int](ctx)
 
 	// Create a stream with errors
 	input := core.Emit(func(ctx context.Context) <-chan core.Result[int] {
@@ -194,23 +178,26 @@ func TestWithErrorCollector(t *testing.T) {
 }
 
 func TestWithLogging(t *testing.T) {
-	ctx, registry := core.WithRegistry(context.Background())
+	ctx := context.Background()
 
 	var logs []string
-	err := WithLogging(registry, func(format string, args ...any) {
+	ctx = WithLogging[int](ctx, func(format string, args ...any) {
 		logs = append(logs, format)
 	})
-	if err != nil {
-		t.Fatalf("WithLogging failed: %v", err)
-	}
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
 	input := testStreamFromSlice([]int{1, 2, 3})
 	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
-	// Should have logged events (StreamStart, ItemReceived*3, ValueReceived*3, ItemEmitted*3, StreamEnd)
-	if len(logs) == 0 {
-		t.Error("expected some log messages")
+	// Should have logged start, 3 values, and complete
+	if len(logs) != 5 {
+		t.Errorf("expected 5 log messages (start + 3 values + complete), got %d: %v", len(logs), logs)
+	}
+	if logs[0] != "stream started" {
+		t.Errorf("first log should be 'stream started', got %s", logs[0])
+	}
+	if logs[4] != "stream completed" {
+		t.Errorf("last log should be 'stream completed', got %s", logs[4])
 	}
 }

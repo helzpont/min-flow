@@ -4,14 +4,12 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"time"
 
 	"github.com/lguimbarda/min-flow/flow"
-	"github.com/lguimbarda/min-flow/flow/core"
 	"github.com/lguimbarda/min-flow/flow/flowerrors"
 )
 
@@ -62,38 +60,31 @@ func retryWithJitterExample() {
 	fmt.Printf("Total time: %v, Total attempts: %d\n\n", time.Since(start), attemptCount)
 }
 
-// circuitBreakerExample demonstrates the circuit breaker pattern
+// circuitBreakerExample demonstrates the circuit breaker pattern using hooks
 func circuitBreakerExample() {
 	fmt.Println("--- Circuit Breaker Pattern ---")
 
-	var circuitOpen atomic.Bool
+	ctx := context.Background()
 
-	// Create a circuit breaker interceptor
-	// Opens after 3 failures and calls the callback
-	cb := flowerrors.NewCircuitBreakerInterceptor(3, func() {
-		circuitOpen.Store(true)
+	// Attach a circuit breaker monitor that opens after 3 failures
+	ctx, cbMonitor := flowerrors.WithCircuitBreakerMonitor[int](ctx, 3, func() {
 		fmt.Println("  [Circuit breaker OPENED]")
 	})
-
-	ctx, registry := flow.WithRegistry(context.Background())
-	_ = registry.Register(cb)
 
 	var callCount int
 	failingService := func(n int) (int, error) {
 		callCount++
 		if n < 5 {
-			return 0, errors.New("service error")
+			return 0, fmt.Errorf("service error for %d", n)
 		}
 		return n * 10, nil
 	}
 
-	// First batch: will trigger circuit breaker
-	fmt.Println("First batch (should trigger circuit breaker):")
-	numbers1 := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
-	processed1 := core.Intercept[int]().Apply(
-		flow.Map(failingService).Apply(numbers1))
+	fmt.Println("Processing (should trigger circuit breaker after 3 failures):")
+	numbers := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
+	processed := flow.Map(failingService).Apply(numbers)
 
-	for res := range processed1.All(ctx) {
+	for res := range processed.All(ctx) {
 		if res.IsError() {
 			fmt.Printf("  Error: %v\n", res.Error())
 		} else {
@@ -101,7 +92,7 @@ func circuitBreakerExample() {
 		}
 	}
 	fmt.Printf("Total calls made: %d\n", callCount)
-	fmt.Printf("Circuit is open: %v\n\n", circuitOpen.Load())
+	fmt.Printf("Circuit is open: %v\n\n", cbMonitor.IsOpen())
 }
 
 // fallbackWithTransformerExample shows using Fallback transformer for error recovery
@@ -138,34 +129,30 @@ func fallbackWithTransformerExample() {
 	fmt.Println()
 }
 
-// errorAggregationExample shows collecting and summarizing errors
+// errorAggregationExample shows collecting and summarizing errors using hooks
 func errorAggregationExample() {
 	fmt.Println("--- Error Aggregation ---")
 	ctx := context.Background()
 
-	// Create an error collector
-	collector := flowerrors.NewErrorCollectorInterceptor()
-
-	ctxWithRegistry, registry := flow.WithRegistry(ctx)
-	_ = registry.Register(collector)
+	// Create an error collector using hooks
+	ctx, collector := flowerrors.WithErrorCollector[int](ctx)
 
 	// Process some items, some of which will fail
 	items := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-	processed := core.Intercept[int]().Apply(
-		flow.Map(func(n int) (int, error) {
-			if n%3 == 0 {
-				return 0, fmt.Errorf("divisible by 3: %d", n)
-			}
-			if n%5 == 0 {
-				return 0, fmt.Errorf("divisible by 5: %d", n)
-			}
-			return n * 10, nil
-		}).Apply(items))
+	processed := flow.Map(func(n int) (int, error) {
+		if n%3 == 0 {
+			return 0, fmt.Errorf("divisible by 3: %d", n)
+		}
+		if n%5 == 0 {
+			return 0, fmt.Errorf("divisible by 5: %d", n)
+		}
+		return n * 10, nil
+	}).Apply(items)
 
 	// Consume the stream
 	var successCount int
-	for res := range processed.All(ctxWithRegistry) {
+	for res := range processed.All(ctx) {
 		if res.IsValue() {
 			successCount++
 		}
@@ -181,72 +168,34 @@ func errorAggregationExample() {
 	fmt.Println()
 }
 
-// partialFailureExample demonstrates processing despite some failures
+// partialFailureExample shows handling partial failures in a batch
 func partialFailureExample() {
 	fmt.Println("--- Partial Failure Handling ---")
 	ctx := context.Background()
 
-	// Simulate batch processing where some items fail
-	items := flow.FromSlice([]string{
-		"valid-1",
-		"invalid",
-		"valid-2",
-		"error-trigger",
-		"valid-3",
-	})
+	// Track error count with hooks
+	ctx, errorCounter := flowerrors.WithErrorCounter[int](ctx, nil)
 
-	// Process items, converting errors to a special value
-	type ProcessResult struct {
-		Input   string
-		Output  string
-		Success bool
-		Error   string
-	}
+	// Process items where some will fail
+	ids := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-	processed := flow.FlatMap(func(item string) ([]ProcessResult, error) {
-		// Simulate processing
-		if item == "invalid" {
-			return []ProcessResult{{
-				Input:   item,
-				Success: false,
-				Error:   "invalid format",
-			}}, nil
+	processed := flow.Map(func(n int) (int, error) {
+		if n == 5 || n == 8 {
+			return 0, fmt.Errorf("failed for id %d", n)
 		}
-		if item == "error-trigger" {
-			return []ProcessResult{{
-				Input:   item,
-				Success: false,
-				Error:   "processing error",
-			}}, nil
-		}
-		return []ProcessResult{{
-			Input:   item,
-			Output:  "processed-" + item,
-			Success: true,
-		}}, nil
-	}).Apply(items)
+		return n * 100, nil
+	}).Apply(ids)
 
-	// Separate successes and failures
-	var successes, failures []ProcessResult
+	fmt.Println("Processing batch:")
+	var successful []int
 	for res := range processed.All(ctx) {
 		if res.IsValue() {
-			r := res.Value()
-			if r.Success {
-				successes = append(successes, r)
-			} else {
-				failures = append(failures, r)
-			}
+			successful = append(successful, res.Value())
+		} else {
+			fmt.Printf("  Error: %v\n", res.Error())
 		}
 	}
 
-	fmt.Printf("Successes (%d):\n", len(successes))
-	for _, r := range successes {
-		fmt.Printf("  %s -> %s\n", r.Input, r.Output)
-	}
-
-	fmt.Printf("Failures (%d):\n", len(failures))
-	for _, r := range failures {
-		fmt.Printf("  %s: %s\n", r.Input, r.Error)
-	}
-	fmt.Println()
+	fmt.Printf("Successful results: %v\n", successful)
+	fmt.Printf("Total errors: %d\n", errorCounter.Count())
 }

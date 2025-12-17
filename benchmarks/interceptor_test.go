@@ -10,16 +10,16 @@ import (
 )
 
 // =============================================================================
-// Interceptor Overhead Benchmarks
-// These benchmarks measure the cost of the interceptor dispatch system.
-// Run with: go test -bench=BenchmarkInterceptor -benchmem
+// Hooks Overhead Benchmarks
+// These benchmarks measure the cost of the typed hooks system.
+// Run with: go test -bench=BenchmarkHooks -benchmem
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// Baseline: Stream processing without interceptors
+// Baseline: Stream processing without hooks
 // -----------------------------------------------------------------------------
 
-func BenchmarkInterceptor_Baseline_NoInterceptors(b *testing.B) {
+func BenchmarkHooks_Baseline_NoHooks(b *testing.B) {
 	data := generateInts(MediumSize)
 	b.ResetTimer()
 
@@ -31,199 +31,216 @@ func BenchmarkInterceptor_Baseline_NoInterceptors(b *testing.B) {
 }
 
 // -----------------------------------------------------------------------------
-// With Intercept[T] transmitter but no registered interceptors
+// With 1 simple hook (Counter - atomic increment)
 // -----------------------------------------------------------------------------
 
-func BenchmarkInterceptor_InterceptNoRegistry(b *testing.B) {
+func BenchmarkHooks_1Counter(b *testing.B) {
 	data := generateInts(MediumSize)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
+		testCtx, _ := observe.WithCounter[int](ctx)
+
 		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(stream)
-		mapped := core.Map(squareWithErr).Apply(intercepted)
-		_, _ = core.Slice(ctx, mapped)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// With Intercept[T] and empty registry
-// -----------------------------------------------------------------------------
-
-func BenchmarkInterceptor_EmptyRegistry(b *testing.B) {
-	data := generateInts(MediumSize)
-	testCtx, _ := core.WithRegistry(ctx)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(testCtx, stream)
-		mapped := core.Map(squareWithErr).Apply(testCtx, intercepted)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
 
 // -----------------------------------------------------------------------------
-// With 1 simple interceptor (CounterInterceptor - atomic increment)
+// With 3 hooks (Counter, ErrorCounter, ValueHook)
 // -----------------------------------------------------------------------------
 
-func BenchmarkInterceptor_1Counter(b *testing.B) {
+func BenchmarkHooks_3Hooks(b *testing.B) {
 	data := generateInts(MediumSize)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		testCtx, registry := core.WithRegistry(ctx)
-		counter := observe.NewCounterInterceptor()
-		_ = registry.Register(counter)
+		testCtx, _ := observe.WithCounter[int](ctx)
+		testCtx, _ = flowerrors.WithErrorCounter[int](testCtx, nil)
+		testCtx = observe.WithValueHook(testCtx, func(int) {})
 
 		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(testCtx, stream)
-		mapped := core.Map(squareWithErr).Apply(testCtx, intercepted)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
 
 // -----------------------------------------------------------------------------
-// With 3 interceptors (Counter, ErrorCounter, Callback)
+// With full Hooks struct (all callbacks)
 // -----------------------------------------------------------------------------
 
-func BenchmarkInterceptor_3Interceptors(b *testing.B) {
+func BenchmarkHooks_FullHooksStruct(b *testing.B) {
 	data := generateInts(MediumSize)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		testCtx, registry := core.WithRegistry(ctx)
-		_ = registry.Register(observe.NewCounterInterceptor())
-		_ = registry.Register(flowerrors.NewErrorCounterInterceptor(nil))
-		_ = registry.Register(observe.NewCallbackInterceptor(
-			observe.WithOnValue(func(any) {}),
-		))
+		testCtx := core.WithHooks(ctx, core.Hooks[int]{
+			OnStart:    func() {},
+			OnValue:    func(int) {},
+			OnError:    func(error) {},
+			OnSentinel: func(error) {},
+			OnComplete: func() {},
+		})
 
 		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(testCtx, stream)
-		mapped := core.Map(squareWithErr).Apply(testCtx, intercepted)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
 
 // -----------------------------------------------------------------------------
-// With MetricsInterceptor (mutex-locked, does time calculations)
+// With 5 hooks (realistic production scenario)
 // -----------------------------------------------------------------------------
 
-func BenchmarkInterceptor_Metrics(b *testing.B) {
+func BenchmarkHooks_5Hooks(b *testing.B) {
 	data := generateInts(MediumSize)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		testCtx, registry := core.WithRegistry(ctx)
-		metrics := observe.NewMetricsInterceptor(nil)
-		_ = registry.Register(metrics)
+		testCtx, _ := observe.WithCounter[int](ctx)
+		testCtx, _ = observe.WithValueCounter[int](testCtx)
+		testCtx, _ = flowerrors.WithErrorCounter[int](testCtx, nil)
+		testCtx, _ = flowerrors.WithErrorCollector[int](testCtx)
+		testCtx = observe.WithValueHook(testCtx, func(int) {})
 
 		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(testCtx, stream)
-		mapped := core.Map(squareWithErr).Apply(testCtx, intercepted)
-		_, _ = core.Slice(testCtx, mapped)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// With 5 interceptors (realistic production scenario)
-// -----------------------------------------------------------------------------
-
-func BenchmarkInterceptor_5Interceptors(b *testing.B) {
-	data := generateInts(MediumSize)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		testCtx, registry := core.WithRegistry(ctx)
-		_ = registry.Register(observe.NewMetricsInterceptor(nil))
-		_ = registry.Register(observe.NewCounterInterceptor())
-		_ = registry.Register(flowerrors.NewErrorCounterInterceptor(nil))
-		_ = registry.Register(flowerrors.NewErrorCollectorInterceptor())
-		_ = registry.Register(observe.NewCallbackInterceptor(
-			observe.WithOnValue(func(any) {}),
-		))
-
-		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(testCtx, stream)
-		mapped := core.Map(squareWithErr).Apply(testCtx, intercepted)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
 
 // =============================================================================
 // Per-item overhead comparison
-// Using a large dataset to measure per-item interceptor cost
+// Using a large dataset to measure per-item hook cost
 // =============================================================================
 
-func BenchmarkInterceptor_PerItem_Baseline(b *testing.B) {
+func BenchmarkHooks_PerItem_Baseline(b *testing.B) {
 	data := generateInts(LargeSize)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		_, _ = core.Slice(ctx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
+		_, _ = core.Slice(ctx, mapped)
 	}
 }
 
-func BenchmarkInterceptor_PerItem_WithIntercept(b *testing.B) {
+func BenchmarkHooks_PerItem_WithCounter(b *testing.B) {
 	data := generateInts(LargeSize)
-	testCtx, registry := core.WithRegistry(ctx)
-	_ = registry.Register(observe.NewCounterInterceptor())
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
+		testCtx, _ := observe.WithCounter[int](ctx)
 		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(testCtx, stream)
-		_, _ = core.Slice(testCtx, intercepted)
+		mapped := core.Map(squareWithErr).Apply(stream)
+		_, _ = core.Slice(testCtx, mapped)
 	}
 }
 
-func BenchmarkInterceptor_PerItem_Buffered16(b *testing.B) {
+func BenchmarkHooks_PerItem_WithLogging(b *testing.B) {
 	data := generateInts(LargeSize)
-	testCtx, registry := core.WithRegistry(ctx)
-	_ = registry.Register(observe.NewCounterInterceptor())
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
+		testCtx := observe.WithLogging[int](ctx, func(string, ...any) {})
 		stream := flow.FromSlice(data)
-		intercepted := core.InterceptBuffered[int](16).Apply(testCtx, stream)
-		_, _ = core.Slice(testCtx, intercepted)
-	}
-}
-
-func BenchmarkInterceptor_PerItem_Buffered64(b *testing.B) {
-	data := generateInts(LargeSize)
-	testCtx, registry := core.WithRegistry(ctx)
-	_ = registry.Register(observe.NewCounterInterceptor())
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		stream := flow.FromSlice(data)
-		intercepted := core.InterceptBuffered[int](64).Apply(testCtx, stream)
-		_, _ = core.Slice(testCtx, intercepted)
-	}
-}
-
-func BenchmarkInterceptor_PerItem_Buffered256(b *testing.B) {
-	data := generateInts(LargeSize)
-	testCtx, registry := core.WithRegistry(ctx)
-	_ = registry.Register(observe.NewCounterInterceptor())
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		stream := flow.FromSlice(data)
-		intercepted := core.InterceptBuffered[int](256).Apply(testCtx, stream)
-		_, _ = core.Slice(testCtx, intercepted)
+		mapped := core.Map(squareWithErr).Apply(stream)
+		_, _ = core.Slice(testCtx, mapped)
 	}
 }
 
 // =============================================================================
-// Event matching overhead
-// Measure the cost of event pattern matching
+// InterceptBuffered with hooks
 // =============================================================================
 
-func BenchmarkInterceptor_EventMatching_Exact(b *testing.B) {
+func BenchmarkHooks_InterceptBuffered16(b *testing.B) {
+	data := generateInts(LargeSize)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		testCtx, _ := observe.WithCounter[int](ctx)
+		stream := flow.FromSlice(data)
+		intercepted := core.InterceptBuffered[int](16).Apply(stream)
+		_, _ = core.Slice(testCtx, intercepted)
+	}
+}
+
+func BenchmarkHooks_InterceptBuffered64(b *testing.B) {
+	data := generateInts(LargeSize)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		testCtx, _ := observe.WithCounter[int](ctx)
+		stream := flow.FromSlice(data)
+		intercepted := core.InterceptBuffered[int](64).Apply(stream)
+		_, _ = core.Slice(testCtx, intercepted)
+	}
+}
+
+func BenchmarkHooks_InterceptBuffered256(b *testing.B) {
+	data := generateInts(LargeSize)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		testCtx, _ := observe.WithCounter[int](ctx)
+		stream := flow.FromSlice(data)
+		intercepted := core.InterceptBuffered[int](256).Apply(stream)
+		_, _ = core.Slice(testCtx, intercepted)
+	}
+}
+
+// =============================================================================
+// Hook registration overhead
+// =============================================================================
+
+func BenchmarkHooks_WithHooks_Single(b *testing.B) {
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = core.WithHooks(ctx, core.Hooks[int]{
+			OnValue: func(int) {},
+		})
+	}
+}
+
+func BenchmarkHooks_WithHooks_Full(b *testing.B) {
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = core.WithHooks(ctx, core.Hooks[int]{
+			OnStart:    func() {},
+			OnValue:    func(int) {},
+			OnError:    func(error) {},
+			OnSentinel: func(error) {},
+			OnComplete: func() {},
+		})
+	}
+}
+
+func BenchmarkHooks_WithCounter(b *testing.B) {
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = observe.WithCounter[int](ctx)
+	}
+}
+
+func BenchmarkHooks_Compose_3Hooks(b *testing.B) {
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		testCtx := core.WithHooks(ctx, core.Hooks[int]{OnValue: func(int) {}})
+		testCtx = core.WithHooks(testCtx, core.Hooks[int]{OnError: func(error) {}})
+		_ = core.WithHooks(testCtx, core.Hooks[int]{OnComplete: func() {}})
+	}
+}
+
+// =============================================================================
+// Event matching overhead (kept for reference, still used by Registry)
+// =============================================================================
+
+func BenchmarkEvent_Matching_Exact(b *testing.B) {
 	event := core.ItemReceived
 	pattern := "item:received"
 	b.ResetTimer()
@@ -233,7 +250,7 @@ func BenchmarkInterceptor_EventMatching_Exact(b *testing.B) {
 	}
 }
 
-func BenchmarkInterceptor_EventMatching_WildcardSuffix(b *testing.B) {
+func BenchmarkEvent_Matching_WildcardSuffix(b *testing.B) {
 	event := core.StreamStart
 	pattern := "stream:*"
 	b.ResetTimer()
@@ -243,7 +260,7 @@ func BenchmarkInterceptor_EventMatching_WildcardSuffix(b *testing.B) {
 	}
 }
 
-func BenchmarkInterceptor_EventMatching_WildcardPrefix(b *testing.B) {
+func BenchmarkEvent_Matching_WildcardPrefix(b *testing.B) {
 	event := core.StreamStart
 	pattern := "*:start"
 	b.ResetTimer()
@@ -253,7 +270,7 @@ func BenchmarkInterceptor_EventMatching_WildcardPrefix(b *testing.B) {
 	}
 }
 
-func BenchmarkInterceptor_EventMatching_All(b *testing.B) {
+func BenchmarkEvent_Matching_All(b *testing.B) {
 	event := core.ItemReceived
 	pattern := "*"
 	b.ResetTimer()
@@ -264,7 +281,7 @@ func BenchmarkInterceptor_EventMatching_All(b *testing.B) {
 }
 
 // =============================================================================
-// Registry operations
+// Registry operations (still available for other delegate types)
 // =============================================================================
 
 func BenchmarkRegistry_WithRegistry(b *testing.B) {
@@ -272,41 +289,6 @@ func BenchmarkRegistry_WithRegistry(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_, _ = core.WithRegistry(ctx)
-	}
-}
-
-func BenchmarkRegistry_Register(b *testing.B) {
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_, registry := core.WithRegistry(ctx)
-		_ = registry.Register(observe.NewCounterInterceptor())
-	}
-}
-
-func BenchmarkRegistry_GetInterceptors_1(b *testing.B) {
-	testCtx, registry := core.WithRegistry(ctx)
-	_ = registry.Register(observe.NewCounterInterceptor())
-	_ = testCtx
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_ = registry.Interceptors()
-	}
-}
-
-func BenchmarkRegistry_GetInterceptors_5(b *testing.B) {
-	testCtx, registry := core.WithRegistry(ctx)
-	_ = registry.Register(observe.NewCounterInterceptor())
-	_ = registry.Register(observe.NewMetricsInterceptor(nil))
-	_ = registry.Register(flowerrors.NewErrorCounterInterceptor(nil))
-	_ = registry.Register(flowerrors.NewErrorCollectorInterceptor())
-	_ = registry.Register(observe.NewCallbackInterceptor())
-	_ = testCtx
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_ = registry.Interceptors()
 	}
 }
 

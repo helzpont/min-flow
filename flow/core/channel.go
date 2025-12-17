@@ -72,10 +72,10 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 		go func() {
 			defer close(out)
 
-			dispatch := newInterceptorDispatch(ctx)
+			hooks := newHookInvoker[T](ctx)
 
-			// Early exit: if no interceptors, just pass through without overhead
-			if !dispatch.hasAny {
+			// Early exit: if no hooks, just pass through without overhead
+			if !hooks.hasAny() {
 				for res := range in {
 					select {
 					case <-ctx.Done():
@@ -86,9 +86,9 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 				return
 			}
 
-			// Invoke stream start interceptors
-			dispatch.invokeNoArg(ctx, StreamStart)
-			defer dispatch.invokeNoArg(ctx, StreamEnd)
+			// Invoke stream start hooks
+			hooks.invokeStart()
+			defer hooks.invokeComplete()
 
 			for res := range in {
 				select {
@@ -97,15 +97,19 @@ func InterceptBuffered[T any](bufferSize int) Transmitter[T, T] {
 				default:
 				}
 
-				// Invoke item-level interceptors
-				dispatch.invokeOneArg(ctx, ItemReceived, res)
-				dispatch.invokeResult(ctx, toAnyResult(res))
+				// Invoke hooks based on result type
+				if res.IsValue() {
+					hooks.invokeValue(res.Value())
+				} else if res.IsError() {
+					hooks.invokeError(res.Error())
+				} else if res.IsSentinel() {
+					hooks.invokeSentinel(res.Error())
+				}
 
 				select {
 				case <-ctx.Done():
 					return
 				case out <- res:
-					dispatch.invokeOneArg(ctx, ItemEmitted, res)
 				}
 			}
 		}()

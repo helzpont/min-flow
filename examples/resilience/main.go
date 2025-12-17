@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/lguimbarda/min-flow/flow"
-	"github.com/lguimbarda/min-flow/flow/core"
 	"github.com/lguimbarda/min-flow/flow/flowerrors"
 )
 
@@ -19,7 +18,7 @@ func main() {
 	retryExample()
 	retryWithBackoffExample()
 	fallbackExample()
-	circuitBreakerInterceptorExample()
+	circuitBreakerExample()
 	errorCollectorExample()
 }
 
@@ -111,19 +110,16 @@ func fallbackExample() {
 	fmt.Println()
 }
 
-// circuitBreakerInterceptorExample shows circuit breaker pattern via interceptors
-func circuitBreakerInterceptorExample() {
-	fmt.Println("--- Circuit Breaker Interceptor Example ---")
+// circuitBreakerExample shows circuit breaker pattern via hooks
+func circuitBreakerExample() {
+	fmt.Println("--- Circuit Breaker Example ---")
 
-	ctx, registry := flow.WithRegistry(context.Background())
+	ctx := context.Background()
 
-	// Create circuit breaker that trips after 3 errors
-	var circuitTripped bool
-	cb := flowerrors.NewCircuitBreakerInterceptor(3, func() {
-		circuitTripped = true
+	// Create circuit breaker monitor that trips after 3 errors
+	ctx, cbMonitor := flowerrors.WithCircuitBreakerMonitor[int](ctx, 3, func() {
 		fmt.Println("  ⚠️  Circuit breaker TRIPPED!")
 	})
-	_ = registry.Register(cb)
 
 	// Create a stream with some errors
 	errStream := flow.Emit(func(ctx context.Context) <-chan flow.Result[int] {
@@ -142,11 +138,12 @@ func circuitBreakerInterceptorExample() {
 		return ch
 	})
 
-	intercepted := core.Intercept[int]().Apply(errStream)
+	// Apply through a mapper to trigger hooks
+	processed := flow.Map(func(x int) (int, error) { return x, nil }).Apply(errStream)
 
 	successCount := 0
 	errorCount := 0
-	for res := range intercepted.All(ctx) {
+	for res := range processed.All(ctx) {
 		if res.IsValue() {
 			successCount++
 		} else {
@@ -155,25 +152,21 @@ func circuitBreakerInterceptorExample() {
 	}
 
 	fmt.Printf("Processed: %d successes, %d errors\n", successCount, errorCount)
-	fmt.Printf("Circuit tripped: %v (failure count: %d)\n", circuitTripped, cb.FailureCount())
+	fmt.Printf("Circuit tripped: %v (failure count: %d)\n", cbMonitor.IsOpen(), cbMonitor.FailureCount())
 	fmt.Println()
 }
 
-// errorCollectorExample shows collecting errors for analysis
+// errorCollectorExample shows collecting errors for analysis using hooks
 func errorCollectorExample() {
 	fmt.Println("--- Error Collector Example ---")
 
-	ctx, registry := flow.WithRegistry(context.Background())
+	ctx := context.Background()
 
 	// Create collector with max 5 errors
-	collector := flowerrors.NewErrorCollectorInterceptor(
-		flowerrors.WithMaxErrors(5),
-	)
-	_ = registry.Register(collector)
+	ctx, collector := flowerrors.WithErrorCollector[string](ctx, flowerrors.WithMaxErrors(5))
 
 	// Also add an error counter
-	counter := flowerrors.NewErrorCounterInterceptor(nil)
-	_ = registry.Register(counter)
+	ctx, counter := flowerrors.WithErrorCounter[string](ctx, nil)
 
 	// Stream with multiple errors
 	errStream := flow.Emit(func(ctx context.Context) <-chan flow.Result[string] {
@@ -190,18 +183,19 @@ func errorCollectorExample() {
 		return ch
 	})
 
-	intercepted := core.Intercept[string]().Apply(errStream)
+	// Apply through a mapper to trigger hooks
+	processed := flow.Map(func(x string) (string, error) { return x, nil }).Apply(errStream)
 
 	// Process stream
 	var values []string
-	for res := range intercepted.All(ctx) {
+	for res := range processed.All(ctx) {
 		if res.IsValue() {
 			values = append(values, res.Value())
 		}
 	}
 
-	fmt.Printf("Values: %v\n", values)
-	fmt.Printf("Total errors: %d\n", counter.Count())
+	fmt.Printf("Successful values: %v\n", values)
+	fmt.Printf("Error count: %d\n", counter.Count())
 	fmt.Println("Collected errors:")
 	for i, err := range collector.Errors() {
 		fmt.Printf("  %d. %v\n", i+1, err)
