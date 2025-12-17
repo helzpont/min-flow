@@ -32,7 +32,7 @@ func TestErrorHandlerInterceptor(t *testing.T) {
 		return ch
 	})
 
-	intercepted := core.Intercept[int]().Apply(ctx, errStream)
+	intercepted := core.Intercept[int]().Apply(errStream)
 
 	for range intercepted.All(ctx) {
 	}
@@ -81,7 +81,7 @@ func TestErrorCounterInterceptor(t *testing.T) {
 				return ch
 			})
 
-			intercepted := core.Intercept[int]().Apply(ctx, errStream)
+			intercepted := core.Intercept[int]().Apply(errStream)
 			for range intercepted.All(ctx) {
 			}
 
@@ -110,7 +110,7 @@ func TestErrorCollectorInterceptor(t *testing.T) {
 			return ch
 		})
 
-		intercepted := core.Intercept[int]().Apply(ctx, errStream)
+		intercepted := core.Intercept[int]().Apply(errStream)
 		for range intercepted.All(ctx) {
 		}
 
@@ -141,7 +141,7 @@ func TestErrorCollectorInterceptor(t *testing.T) {
 			return ch
 		})
 
-		intercepted := core.Intercept[int]().Apply(ctx, errStream)
+		intercepted := core.Intercept[int]().Apply(errStream)
 		for range intercepted.All(ctx) {
 		}
 
@@ -165,7 +165,7 @@ func TestErrorCollectorInterceptor(t *testing.T) {
 			return ch
 		})
 
-		intercepted := core.Intercept[int]().Apply(ctx, errStream)
+		intercepted := core.Intercept[int]().Apply(errStream)
 		for range intercepted.All(ctx) {
 		}
 
@@ -195,7 +195,7 @@ func TestCircuitBreakerInterceptor(t *testing.T) {
 			return ch
 		})
 
-		intercepted := core.Intercept[int]().Apply(ctx, errStream)
+		intercepted := core.Intercept[int]().Apply(errStream)
 		for range intercepted.All(ctx) {
 		}
 
@@ -226,7 +226,7 @@ func TestCircuitBreakerInterceptor(t *testing.T) {
 			return ch
 		})
 
-		intercepted := core.Intercept[int]().Apply(ctx, mixedStream)
+		intercepted := core.Intercept[int]().Apply(mixedStream)
 		for range intercepted.All(ctx) {
 		}
 
@@ -254,7 +254,7 @@ func TestCircuitBreakerInterceptor(t *testing.T) {
 			return ch
 		})
 
-		intercepted := core.Intercept[int]().Apply(ctx, errStream)
+		intercepted := core.Intercept[int]().Apply(errStream)
 		for range intercepted.All(ctx) {
 		}
 

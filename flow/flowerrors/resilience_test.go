@@ -77,7 +77,7 @@ func TestRetry(t *testing.T) {
 				return v * 2, nil
 			}
 
-			result := flowerrors.Retry(tt.maxRetries, operation).Apply(ctx, stream)
+			result := flowerrors.Retry(tt.maxRetries, operation).Apply(stream)
 
 			var values []int
 			var errCount int
@@ -143,7 +143,7 @@ func TestRetryWithBackoff(t *testing.T) {
 			}
 
 			start := time.Now()
-			result := flowerrors.RetryWithBackoff(tt.attempts, tt.strategy, operation).Apply(ctx, stream)
+			result := flowerrors.RetryWithBackoff(tt.attempts, tt.strategy, operation).Apply(stream)
 			got, err := flow.Slice[int](ctx, result)
 			elapsed := time.Since(start)
 
@@ -208,7 +208,7 @@ func TestRetryWhen(t *testing.T) {
 				return v * 2, nil
 			}
 
-			result := flowerrors.RetryWhen(tt.maxRetries, tt.shouldRetry, operation).Apply(ctx, stream)
+			result := flowerrors.RetryWhen(tt.maxRetries, tt.shouldRetry, operation).Apply(stream)
 
 			var hasValue bool
 			for r := range result.Emit(ctx) {
@@ -318,7 +318,7 @@ func TestWithCircuitBreaker(t *testing.T) {
 	}
 	cb := flowerrors.NewCircuitBreaker(operation, 3, 100*time.Millisecond, 1)
 
-	result := flowerrors.WithCircuitBreaker(cb).Apply(ctx, stream)
+	result := flowerrors.WithCircuitBreaker(cb).Apply(stream)
 	got, err := flow.Slice[int](ctx, result)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -355,7 +355,7 @@ func TestFallback(t *testing.T) {
 			return v * 10
 		}
 
-		result := flowerrors.Fallback(fallbackFn).Apply(ctx, stream)
+		result := flowerrors.Fallback(fallbackFn).Apply(stream)
 
 		var values []int
 		for r := range result.Emit(ctx) {
@@ -388,7 +388,7 @@ func TestFallback(t *testing.T) {
 		})
 		stream := emitter
 
-		result := flowerrors.FallbackValue(-1).Apply(ctx, stream)
+		result := flowerrors.FallbackValue(-1).Apply(stream)
 
 		var values []int
 		var errCount int
@@ -430,7 +430,7 @@ func TestRecover(t *testing.T) {
 			return 999, nil
 		}
 
-		result := flowerrors.Recover(recoverFn).Apply(ctx, stream)
+		result := flowerrors.Recover(recoverFn).Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -462,7 +462,7 @@ func TestRecover(t *testing.T) {
 			return 0, errors.New("recovery failed")
 		}
 
-		result := flowerrors.Recover(recoverFn).Apply(ctx, stream)
+		result := flowerrors.Recover(recoverFn).Apply(stream)
 
 		var errCount int
 		for r := range result.Emit(ctx) {
@@ -500,7 +500,7 @@ func TestRecoverPanic(t *testing.T) {
 		return -1, nil
 	}
 
-	result := flowerrors.RecoverPanic(recoverFn).Apply(ctx, stream)
+	result := flowerrors.RecoverPanic(recoverFn).Apply(stream)
 
 	var values []int
 	var errCount int
@@ -537,7 +537,7 @@ func TestRetryContextCancellation(t *testing.T) {
 	}
 
 	stream := flow.FromSlice([]int{1, 2, 3})
-	result := flowerrors.RetryWithBackoff(10, flowerrors.ConstantBackoff(10*time.Millisecond), operation).Apply(ctx, stream)
+	result := flowerrors.RetryWithBackoff(10, flowerrors.ConstantBackoff(10*time.Millisecond), operation).Apply(stream)
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)

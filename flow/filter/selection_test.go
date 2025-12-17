@@ -51,7 +51,7 @@ func TestFind(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.Find(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -116,7 +116,7 @@ func TestFindIndex(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.FindIndex(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -173,7 +173,7 @@ func TestFindLast(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.FindLast(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -232,7 +232,7 @@ func TestFindLastIndex(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.FindLastIndex(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -297,7 +297,7 @@ func TestContains(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.Contains(tt.value)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -341,7 +341,7 @@ func TestContainsBy(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.ContainsBy(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -390,7 +390,7 @@ func TestIsEmpty(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.IsEmpty[int]()
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -430,7 +430,7 @@ func TestIsNotEmpty(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.IsNotEmpty[int]()
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -499,7 +499,7 @@ func TestSequenceEqual(t *testing.T) {
 			stream := flow.FromSlice(tt.input)
 			other := flow.FromSlice(tt.other)
 			transformer := filter.SequenceEqual(other)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -544,7 +544,7 @@ func TestSequenceEqualBy(t *testing.T) {
 			other := flow.FromSlice(tt.other)
 			equals := func(a, b item) bool { return a.id == b.id }
 			transformer := filter.SequenceEqualBy(other, equals)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -609,7 +609,7 @@ func TestCountIf(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.CountIf(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -665,7 +665,7 @@ func TestIndexOf(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.IndexOf(tt.value)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -721,7 +721,7 @@ func TestLastIndexOf(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.LastIndexOf(tt.value)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -740,7 +740,7 @@ func TestSelectionContextCancellation(t *testing.T) {
 
 		stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 		transformer := filter.Find(func(int) bool { return false })
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		_, _ = flow.Slice(ctx, result)
 		// Just ensure it doesn't hang
 	})
@@ -751,7 +751,7 @@ func TestSelectionContextCancellation(t *testing.T) {
 
 		stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 		transformer := filter.Contains(10)
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		_, _ = flow.Slice(ctx, result)
 		// Just ensure it doesn't hang
 	})
@@ -762,7 +762,7 @@ func TestSelectionWithStrings(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]string{"apple", "banana", "cherry"})
 		transformer := filter.Find(func(s string) bool { return len(s) > 5 })
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -776,7 +776,7 @@ func TestSelectionWithStrings(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]string{"apple", "banana", "cherry"})
 		transformer := filter.Contains("banana")
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

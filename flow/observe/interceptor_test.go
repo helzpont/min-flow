@@ -39,7 +39,7 @@ func TestMetricsInterceptor(t *testing.T) {
 			}
 
 			stream := flow.FromSlice(tt.input)
-			intercepted := core.Intercept[int]().Apply(ctx, stream)
+			intercepted := core.Intercept[int]().Apply(stream)
 
 			for range intercepted.All(ctx) {
 			}
@@ -64,7 +64,7 @@ func TestLiveMetricsInterceptor(t *testing.T) {
 	}
 
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-	intercepted := core.Intercept[int]().Apply(ctx, stream)
+	intercepted := core.Intercept[int]().Apply(stream)
 
 	for range intercepted.All(ctx) {
 	}
@@ -86,7 +86,7 @@ func TestCounterInterceptor(t *testing.T) {
 	}
 
 	stream := flow.FromSlice([]int{1, 2, 3})
-	intercepted := core.Intercept[int]().Apply(ctx, stream)
+	intercepted := core.Intercept[int]().Apply(stream)
 
 	for range intercepted.All(ctx) {
 	}
@@ -115,7 +115,7 @@ func TestCallbackInterceptor(t *testing.T) {
 	}
 
 	stream := flow.FromSlice([]int{1, 2, 3})
-	intercepted := core.Intercept[int]().Apply(ctx, stream)
+	intercepted := core.Intercept[int]().Apply(stream)
 
 	for range intercepted.All(ctx) {
 	}
@@ -145,7 +145,7 @@ func TestLogInterceptor(t *testing.T) {
 	}
 
 	stream := flow.FromSlice([]int{1})
-	intercepted := core.Intercept[int]().Apply(ctx, stream)
+	intercepted := core.Intercept[int]().Apply(stream)
 
 	for range intercepted.All(ctx) {
 	}
@@ -174,7 +174,7 @@ func TestInterceptorWithErrors(t *testing.T) {
 		return ch
 	})
 
-	intercepted := core.Intercept[int]().Apply(ctx, errStream)
+	intercepted := core.Intercept[int]().Apply(errStream)
 
 	for range intercepted.All(ctx) {
 	}
@@ -202,7 +202,7 @@ func TestMultipleInterceptors(t *testing.T) {
 	_ = registry.Register(metricsInterceptor)
 
 	stream := flow.FromSlice([]int{1, 2, 3})
-	intercepted := core.Intercept[int]().Apply(ctx, stream)
+	intercepted := core.Intercept[int]().Apply(stream)
 
 	for range intercepted.All(ctx) {
 	}
@@ -236,7 +236,7 @@ func TestMetricsInterceptorTiming(t *testing.T) {
 		return ch
 	})
 
-	intercepted := core.Intercept[int]().Apply(ctx, slowStream)
+	intercepted := core.Intercept[int]().Apply(slowStream)
 
 	for range intercepted.All(ctx) {
 	}

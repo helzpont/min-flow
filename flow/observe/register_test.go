@@ -36,7 +36,7 @@ func TestOnValue(t *testing.T) {
 		return x * 2, nil
 	})
 	input := testStreamFromSlice([]int{1, 2, 3})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 
 	_, _ = core.Slice(ctx, output)
 
@@ -69,7 +69,7 @@ func TestOnError(t *testing.T) {
 
 	// Process through a mapper (which auto-invokes interceptors)
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if len(errors) != 1 {
@@ -99,7 +99,7 @@ func TestOnStartAndComplete(t *testing.T) {
 	// Process a stream
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
 	input := testStreamFromSlice([]int{1, 2, 3})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if startCalled.Load() != 1 {
@@ -130,7 +130,7 @@ func TestWithCounter(t *testing.T) {
 	})
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if counter.Values() != 3 {
@@ -154,7 +154,7 @@ func TestWithValueCounter(t *testing.T) {
 
 	mapper := core.Map(func(x int) (int, error) { return x * 2, nil })
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if counter.Count() != 5 {
@@ -182,7 +182,7 @@ func TestWithErrorCollector(t *testing.T) {
 	})
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	if !collector.HasErrors() {
@@ -206,7 +206,7 @@ func TestWithLogging(t *testing.T) {
 
 	mapper := core.Map(func(x int) (int, error) { return x, nil })
 	input := testStreamFromSlice([]int{1, 2, 3})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	// Should have logged events (StreamStart, ItemReceived*3, ValueReceived*3, ItemEmitted*3, StreamEnd)

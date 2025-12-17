@@ -123,7 +123,7 @@ func TestWriteRecords(t *testing.T) {
 		close(out)
 		return out
 	})
-	output := WriteRecords(tmpFile).Apply(ctx, input)
+	output := WriteRecords(tmpFile).Apply(input)
 	var count int
 	for res := range output.Emit(ctx) {
 		if res.IsError() {
@@ -154,7 +154,7 @@ func TestWriteRecordsTo(t *testing.T) {
 		close(out)
 		return out
 	})
-	output := WriteRecordsTo(&buf).Apply(ctx, input)
+	output := WriteRecordsTo(&buf).Apply(input)
 	for range output.Emit(ctx) {
 	}
 	expected := "a,b\n1,2\n"
@@ -168,7 +168,7 @@ func TestSkipHeader(t *testing.T) {
 	reader := strings.NewReader(content)
 	ctx := context.Background()
 	stream := ReadRecordsFrom(reader)
-	output := SkipHeader().Apply(ctx, stream)
+	output := SkipHeader().Apply(stream)
 	var results [][]string
 	for res := range output.Emit(ctx) {
 		if res.IsError() {
@@ -232,7 +232,7 @@ func TestDecodeCSV(t *testing.T) {
 				return out
 			})
 
-			output := DecodeCSV().Apply(ctx, input)
+			output := DecodeCSV().Apply(input)
 
 			var results [][]string
 			for res := range output.Emit(ctx) {
@@ -275,7 +275,7 @@ func TestDecodeCSV_ChunkedInput(t *testing.T) {
 		return out
 	})
 
-	output := DecodeCSV().Apply(ctx, input)
+	output := DecodeCSV().Apply(input)
 
 	var results [][]string
 	for res := range output.Emit(ctx) {
@@ -300,7 +300,7 @@ func TestDecodeCSV_WithOptions(t *testing.T) {
 		return out
 	})
 
-	output := DecodeCSVBuffered(DefaultBufferSize, WithComma(';')).Apply(ctx, input)
+	output := DecodeCSVBuffered(DefaultBufferSize, WithComma(';')).Apply(input)
 
 	var results [][]string
 	for res := range output.Emit(ctx) {
@@ -356,7 +356,7 @@ func TestEncodeCSV(t *testing.T) {
 				return out
 			})
 
-			output := EncodeCSV().Apply(ctx, input)
+			output := EncodeCSV().Apply(input)
 
 			var result bytes.Buffer
 			for res := range output.Emit(ctx) {
@@ -383,7 +383,7 @@ func TestEncodeCSV_WithOptions(t *testing.T) {
 		return out
 	})
 
-	output := EncodeCSVBuffered(DefaultBufferSize, WithWriterComma(';')).Apply(ctx, input)
+	output := EncodeCSVBuffered(DefaultBufferSize, WithWriterComma(';')).Apply(input)
 
 	var result bytes.Buffer
 	for res := range output.Emit(ctx) {
@@ -412,7 +412,7 @@ func TestEncodeCSV_ErrorPassthrough(t *testing.T) {
 		return out
 	})
 
-	output := EncodeCSV().Apply(ctx, input)
+	output := EncodeCSV().Apply(input)
 
 	var values int
 	var errors int
@@ -452,7 +452,7 @@ func TestDecodeCSV_EncodeCSV_Roundtrip(t *testing.T) {
 	})
 
 	var encoded bytes.Buffer
-	encodeOutput := EncodeCSV().Apply(ctx, encodeInput)
+	encodeOutput := EncodeCSV().Apply(encodeInput)
 	for res := range encodeOutput.Emit(ctx) {
 		if res.IsError() {
 			t.Fatalf("encode error: %v", res.Error())
@@ -468,7 +468,7 @@ func TestDecodeCSV_EncodeCSV_Roundtrip(t *testing.T) {
 		return out
 	})
 
-	decodeOutput := DecodeCSV().Apply(ctx, decodeInput)
+	decodeOutput := DecodeCSV().Apply(decodeInput)
 
 	var decoded [][]string
 	for res := range decodeOutput.Emit(ctx) {

@@ -53,7 +53,7 @@ func TestDecode(t *testing.T) {
 				return out
 			})
 
-			output := Decode[Person]().Apply(ctx, input)
+			output := Decode[Person]().Apply(input)
 
 			var values []Person
 			var errors int
@@ -94,7 +94,7 @@ func TestEncode(t *testing.T) {
 		return out
 	})
 
-	output := Encode[Person]().Apply(ctx, input)
+	output := Encode[Person]().Apply(input)
 
 	var values []string
 	for res := range output.Emit(ctx) {
@@ -227,7 +227,7 @@ func TestDecode_ErrorPassthrough(t *testing.T) {
 		return out
 	})
 
-	output := Decode[Person]().Apply(ctx, input)
+	output := Decode[Person]().Apply(input)
 
 	var values []Person
 	var errors int
@@ -258,7 +258,7 @@ func TestDecodeBytes(t *testing.T) {
 		return out
 	})
 
-	output := DecodeBytes[Person]().Apply(ctx, input)
+	output := DecodeBytes[Person]().Apply(input)
 
 	var values []Person
 	for res := range output.Emit(ctx) {
@@ -285,7 +285,7 @@ func TestEncodeBytes(t *testing.T) {
 		return out
 	})
 
-	output := EncodeBytes[Person]().Apply(ctx, input)
+	output := EncodeBytes[Person]().Apply(input)
 
 	var values []string
 	for res := range output.Emit(ctx) {

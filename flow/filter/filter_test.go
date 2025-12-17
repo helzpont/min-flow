@@ -45,7 +45,7 @@ func TestFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			filtered := filter.Where(tt.predicate).Apply(ctx, stream)
+			filtered := filter.Where(tt.predicate).Apply(stream)
 			got, err := flow.Slice[int](ctx, filtered)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -72,7 +72,7 @@ func TestFilterMap(t *testing.T) {
 			return n * 2, true
 		}
 		return 0, false
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, filtered)
 	if err != nil {
@@ -93,7 +93,7 @@ func TestFilterMap(t *testing.T) {
 func TestFilterError(t *testing.T) {
 	ctx := context.Background()
 	stream := flow.FromSlice([]int{1, 2, 3})
-	filtered := filter.Errors[int]().Apply(ctx, stream)
+	filtered := filter.Errors[int]().Apply(stream)
 
 	got, err := flow.Slice[int](ctx, filtered)
 	if err != nil {
@@ -113,7 +113,7 @@ func TestExclude(t *testing.T) {
 	// Exclude even numbers
 	filtered := filter.Exclude(func(n int) bool {
 		return n%2 == 0
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, filtered)
 	if err != nil {
@@ -131,7 +131,7 @@ func TestFilterContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
-	filtered := filter.Where(func(n int) bool { return true }).Apply(ctx, stream)
+	filtered := filter.Where(func(n int) bool { return true }).Apply(stream)
 
 	got, _ := flow.Slice[int](ctx, filtered)
 	// Should get empty or partial result due to cancellation

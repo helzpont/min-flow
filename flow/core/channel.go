@@ -36,7 +36,7 @@ func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) 
 	return transmitter
 }
 
-func (t Transmitter[IN, OUT]) Apply(ctx context.Context, in Stream[IN]) Stream[OUT] {
+func (t Transmitter[IN, OUT]) Apply(in Stream[IN]) Stream[OUT] {
 	return Emit(func(ctx context.Context) <-chan Result[OUT] {
 		return t(ctx, in.Emit(ctx))
 	})

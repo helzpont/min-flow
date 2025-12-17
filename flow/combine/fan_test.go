@@ -111,7 +111,7 @@ func TestBroadcast(t *testing.T) {
 	broadcast := combine.Broadcast(
 		func(n int) { atomic.AddInt32(&count1, 1) },
 		func(n int) { atomic.AddInt32(&count2, 1) },
-	).Apply(ctx, stream)
+	).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, broadcast)
 	if err != nil {
@@ -138,7 +138,7 @@ func TestRoundRobin(t *testing.T) {
 
 	doubled := combine.RoundRobin(3, func(n int) int {
 		return n * 2
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, doubled)
 	if err != nil {

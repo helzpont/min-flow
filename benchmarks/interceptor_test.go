@@ -25,7 +25,7 @@ func BenchmarkInterceptor_Baseline_NoInterceptors(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(ctx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(ctx, mapped)
 	}
 }
@@ -40,8 +40,8 @@ func BenchmarkInterceptor_InterceptNoRegistry(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		intercepted := core.Intercept[int]().Apply(ctx, stream)
-		mapped := core.Map(squareWithErr).Apply(ctx, intercepted)
+		intercepted := core.Intercept[int]().Apply(stream)
+		mapped := core.Map(squareWithErr).Apply(intercepted)
 		_, _ = core.Slice(ctx, mapped)
 	}
 }

@@ -15,7 +15,7 @@ func TestWindowTime(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 
-		result := aggregate.WindowTime[int](50*time.Millisecond).Apply(ctx, stream)
+		result := aggregate.WindowTime[int](50*time.Millisecond).Apply(stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -41,7 +41,7 @@ func TestWindowTime(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{})
 
-		result := aggregate.WindowTime[int](50*time.Millisecond).Apply(ctx, stream)
+		result := aggregate.WindowTime[int](50*time.Millisecond).Apply(stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -59,7 +59,7 @@ func TestTumblingWindow(t *testing.T) {
 	ctx := context.Background()
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 
-	result := aggregate.TumblingWindow[int](50*time.Millisecond).Apply(ctx, stream)
+	result := aggregate.TumblingWindow[int](50*time.Millisecond).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -95,7 +95,7 @@ func TestSessionWindow(t *testing.T) {
 		}()
 
 		stream := flow.FromChannel(ch)
-		result := aggregate.SessionWindow[int](50*time.Millisecond).Apply(ctx, stream)
+		result := aggregate.SessionWindow[int](50*time.Millisecond).Apply(stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -121,7 +121,7 @@ func TestSessionWindow(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 3})
 
-		result := aggregate.SessionWindow[int](1*time.Second).Apply(ctx, stream)
+		result := aggregate.SessionWindow[int](1*time.Second).Apply(stream)
 		got, err := flow.Slice(ctx, result)
 
 		if err != nil {
@@ -171,7 +171,7 @@ func TestWindowWithBoundary(t *testing.T) {
 		return out
 	})
 
-	result := aggregate.WindowWithBoundary[int, int](boundary).Apply(ctx, source)
+	result := aggregate.WindowWithBoundary[int, int](boundary).Apply(source)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -207,7 +207,7 @@ func TestGroupByTime(t *testing.T) {
 		return item.Time
 	}
 
-	result := aggregate.GroupByTime(keyFn, 50*time.Millisecond).Apply(ctx, stream)
+	result := aggregate.GroupByTime(keyFn, 50*time.Millisecond).Apply(stream)
 	got, err := flow.Slice(ctx, result)
 
 	if err != nil {
@@ -247,7 +247,7 @@ func TestHoppingWindow(t *testing.T) {
 
 		stream := flow.FromChannel(ch)
 		// 100ms window, emit every 50ms
-		result := aggregate.HoppingWindow[int](100*time.Millisecond, 50*time.Millisecond).Apply(ctx, stream)
+		result := aggregate.HoppingWindow[int](100*time.Millisecond, 50*time.Millisecond).Apply(stream)
 		got, _ := flow.Slice(ctx, result)
 
 		// Should have overlapping windows
@@ -273,7 +273,7 @@ func TestWindowTimeWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := aggregate.WindowTime[int](100*time.Millisecond).Apply(ctx, emitter)
+	result := aggregate.WindowTime[int](100*time.Millisecond).Apply(emitter)
 
 	var windows [][]int
 	var errCount int
@@ -312,7 +312,7 @@ func TestWindowTimeContextCancellation(t *testing.T) {
 	}()
 
 	stream := flow.FromChannel(ch)
-	result := aggregate.WindowTime[int](50*time.Millisecond).Apply(ctx, stream)
+	result := aggregate.WindowTime[int](50*time.Millisecond).Apply(stream)
 	outCh := result.Emit(ctx)
 
 	// Get one window
@@ -353,7 +353,7 @@ func TestSessionWindowWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := aggregate.SessionWindow[int](50*time.Millisecond).Apply(ctx, emitter)
+	result := aggregate.SessionWindow[int](50*time.Millisecond).Apply(emitter)
 
 	var windows [][]int
 	var errCount int
@@ -396,7 +396,7 @@ func TestGroupByTimeWithErrors(t *testing.T) {
 		return item.Time
 	}
 
-	result := aggregate.GroupByTime(keyFn, 50*time.Millisecond).Apply(ctx, emitter)
+	result := aggregate.GroupByTime(keyFn, 50*time.Millisecond).Apply(emitter)
 
 	var groups [][]Item
 	var errCount int
@@ -436,7 +436,7 @@ func TestHoppingWindowWithErrors(t *testing.T) {
 		return out
 	})
 
-	result := aggregate.HoppingWindow[int](100*time.Millisecond, 50*time.Millisecond).Apply(ctx, emitter)
+	result := aggregate.HoppingWindow[int](100*time.Millisecond, 50*time.Millisecond).Apply(emitter)
 
 	var windows [][]int
 	var errCount int

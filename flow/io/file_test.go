@@ -185,7 +185,7 @@ func TestWriteLines(t *testing.T) {
 		return out
 	})
 
-	output := WriteLines(tmpFile).Apply(ctx, input)
+	output := WriteLines(tmpFile).Apply(input)
 
 	var results []string
 	for res := range output.Emit(ctx) {
@@ -226,7 +226,7 @@ func TestAppendLines(t *testing.T) {
 		return out
 	})
 
-	output := AppendLines(tmpFile).Apply(ctx, input)
+	output := AppendLines(tmpFile).Apply(input)
 
 	for range output.Emit(ctx) {
 	}
@@ -254,7 +254,7 @@ func TestWriteTo(t *testing.T) {
 		return out
 	})
 
-	output := WriteTo(&buf).Apply(ctx, input)
+	output := WriteTo(&buf).Apply(input)
 
 	for range output.Emit(ctx) {
 	}
@@ -279,7 +279,7 @@ func TestWriteLines_ErrorPassthrough(t *testing.T) {
 		return out
 	})
 
-	output := WriteLines(tmpFile).Apply(ctx, input)
+	output := WriteLines(tmpFile).Apply(input)
 
 	var values []string
 	var errors int
@@ -447,7 +447,7 @@ func TestToWriter(t *testing.T) {
 				return out
 			})
 
-			output := ToWriter(&buf).Apply(ctx, input)
+			output := ToWriter(&buf).Apply(input)
 
 			var results [][]byte
 			for res := range output.Emit(ctx) {
@@ -484,7 +484,7 @@ func TestToWriter_ErrorPassthrough(t *testing.T) {
 		return out
 	})
 
-	output := ToWriter(&buf).Apply(ctx, input)
+	output := ToWriter(&buf).Apply(input)
 
 	var values int
 	var errors int
@@ -518,7 +518,7 @@ func TestFromReader_ToWriter_Roundtrip(t *testing.T) {
 
 	ctx := context.Background()
 	stream := FromReader(reader, 8)
-	output := ToWriter(&writer).Apply(ctx, stream)
+	output := ToWriter(&writer).Apply(stream)
 
 	for res := range output.Emit(ctx) {
 		if res.IsError() {

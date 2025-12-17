@@ -22,7 +22,7 @@ import (
 //	observe.OnComplete(registry, func() { fmt.Println("Done!") })
 //
 //	// Stream processing automatically invokes registered observers
-//	result := someMapper.Apply(ctx, stream)
+//	result := someMapper.Apply(stream)
 
 // compositeInterceptor accumulates multiple callbacks and invokes them for events.
 // It supports adding callbacks after creation, unlike CallbackInterceptor.

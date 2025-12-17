@@ -34,9 +34,9 @@ func benchmarkPipelineMinFlow(b *testing.B, size int) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(ctx, stream)
-		filtered := filter.Where(isEven).Apply(ctx, mapped)
-		reduced := aggregate.Reduce(add).Apply(ctx, filtered)
+		mapped := core.Map(squareWithErr).Apply(stream)
+		filtered := filter.Where(isEven).Apply(mapped)
+		reduced := aggregate.Reduce(add).Apply(filtered)
 		_, _ = core.Slice(ctx, reduced)
 	}
 }
@@ -51,10 +51,10 @@ func BenchmarkPipeline_MinFlowUnfused_Large(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s1 := addOne.Apply(ctx, stream)
-		s2 := double.Apply(ctx, s1)
-		s3 := addTen.Apply(ctx, s2)
-		reduced := aggregate.Reduce(add).Apply(ctx, s3)
+		s1 := addOne.Apply(stream)
+		s2 := double.Apply(s1)
+		s3 := addTen.Apply(s2)
+		reduced := aggregate.Reduce(add).Apply(s3)
 		_, _ = core.Slice(ctx, reduced)
 	}
 }
@@ -71,8 +71,8 @@ func BenchmarkPipeline_MinFlowFused_Large(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		mapped := fused.Apply(ctx, stream)
-		reduced := aggregate.Reduce(add).Apply(ctx, mapped)
+		mapped := fused.Apply(stream)
+		reduced := aggregate.Reduce(add).Apply(mapped)
 		_, _ = core.Slice(ctx, reduced)
 	}
 }

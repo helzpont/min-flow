@@ -16,7 +16,7 @@ import (
 //	counter, _ := flowerrors.WithErrorCounter(registry, nil)
 //
 //	// Stream processing automatically invokes registered observers
-//	result := someMapper.Apply(ctx, stream)
+//	result := someMapper.Apply(stream)
 //	fmt.Printf("Errors encountered: %d\n", counter.Count())
 
 // OnErrorDo registers a callback that fires for each error in any stream.

@@ -89,7 +89,7 @@ func TestFilter(t *testing.T) {
 	dir := setupTestDir(t)
 	ctx := context.Background()
 	stream := WalkFiles(dir)
-	filtered := Filter("*.txt").Apply(ctx, stream)
+	filtered := Filter("*.txt").Apply(stream)
 	var results []string
 	for res := range filtered.Emit(ctx) {
 		if res.IsError() {
@@ -129,7 +129,7 @@ func TestStat(t *testing.T) {
 		close(out)
 		return out
 	})
-	output := Stat().Apply(ctx, input)
+	output := Stat().Apply(input)
 	var results []FileInfo
 	for res := range output.Emit(ctx) {
 		if res.IsError() {

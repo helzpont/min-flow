@@ -37,7 +37,7 @@ func metricsExample() {
 	numbers := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
 	// Apply interception to collect metrics
-	intercepted := core.Intercept[int]().Apply(ctx, numbers)
+	intercepted := core.Intercept[int]().Apply(numbers)
 
 	// Process the stream
 	sum := 0
@@ -85,7 +85,7 @@ func callbackExample() {
 
 	// Process stream
 	numbers := flow.FromSlice([]int{10, 20, 30, 40, 50})
-	intercepted := core.Intercept[int]().Apply(ctx, numbers)
+	intercepted := core.Intercept[int]().Apply(numbers)
 
 	for range intercepted.All(ctx) {
 	}
@@ -116,7 +116,7 @@ func multipleInterceptorsExample() {
 
 	// Process stream
 	numbers := flow.FromSlice([]int{1, 2, 3})
-	intercepted := core.Intercept[int]().Apply(ctx, numbers)
+	intercepted := core.Intercept[int]().Apply(numbers)
 
 	results := []int{}
 	for res := range intercepted.All(ctx) {

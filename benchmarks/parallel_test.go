@@ -52,7 +52,7 @@ func benchmarkParallelMapMinFlow(b *testing.B, workers int) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		mapped := parallel.Map(workers, expensiveSquare).Apply(ctx, stream)
+		mapped := parallel.Map(workers, expensiveSquare).Apply(stream)
 		_, _ = core.Slice(ctx, mapped)
 	}
 }

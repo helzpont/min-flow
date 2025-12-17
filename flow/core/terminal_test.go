@@ -347,7 +347,7 @@ func TestSink_Apply(t *testing.T) {
 			return out
 		})
 
-		resultStream := ToSlice[int]().Apply(ctx, stream)
+		resultStream := ToSlice[int]().Apply(stream)
 		results := Collect(ctx, resultStream)
 
 		if len(results) != 1 {
@@ -377,7 +377,7 @@ func TestSink_Apply(t *testing.T) {
 			return out
 		})
 
-		resultStream := ToFirst[int]().Apply(ctx, stream)
+		resultStream := ToFirst[int]().Apply(stream)
 		results := Collect(ctx, resultStream)
 
 		if len(results) != 1 {
@@ -405,7 +405,7 @@ func TestSink_Apply(t *testing.T) {
 			return out
 		})
 
-		resultStream := ToSlice[int]().Apply(ctx, stream)
+		resultStream := ToSlice[int]().Apply(stream)
 		results := Collect(ctx, resultStream)
 
 		if len(results) != 1 {

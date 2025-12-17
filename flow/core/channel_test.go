@@ -132,7 +132,7 @@ func TestTransmit(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	result := transmitter.Apply(ctx, input)
+	result := transmitter.Apply(input)
 
 	var values []string
 	for res := range result.Emit(ctx) {
@@ -167,7 +167,7 @@ func TestTransmitter_Apply_ErrorPropagation(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	result := transmitter.Apply(ctx, input)
+	result := transmitter.Apply(input)
 
 	var gotError bool
 	for res := range result.Emit(ctx) {

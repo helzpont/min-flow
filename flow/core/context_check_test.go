@@ -387,7 +387,7 @@ func BenchmarkFlatMapperVsIterFlatMapper(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			ctx := context.Background()
 			stream := makeStream()
-			mapped := fm.Apply(ctx, stream)
+			mapped := fm.Apply(stream)
 			_, _ = Slice(ctx, mapped)
 		}
 	})
@@ -407,7 +407,7 @@ func BenchmarkFlatMapperVsIterFlatMapper(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			ctx := context.Background()
 			stream := makeStream()
-			mapped := ifm.Apply(ctx, stream)
+			mapped := ifm.Apply(stream)
 			_, _ = Slice(ctx, mapped)
 		}
 	})
@@ -425,7 +425,7 @@ func BenchmarkFlatMapperVsIterFlatMapper(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			ctx := context.Background()
 			stream := makeStream()
-			mapped := ifm.Apply(ctx, stream)
+			mapped := ifm.Apply(stream)
 			_, _ = Slice(ctx, mapped)
 		}
 	})

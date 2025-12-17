@@ -254,7 +254,7 @@ func BenchmarkChain_1Transformer(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s1 := t1.Apply(ctx, stream)
+		s1 := t1.Apply(stream)
 		_, _ = core.Slice(ctx, s1)
 	}
 }
@@ -267,8 +267,8 @@ func BenchmarkChain_2Transformers(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s1 := t1.Apply(ctx, stream)
-		s2 := t2.Apply(ctx, s1)
+		s1 := t1.Apply(stream)
+		s2 := t2.Apply(s1)
 		_, _ = core.Slice(ctx, s2)
 	}
 }
@@ -282,9 +282,9 @@ func BenchmarkChain_3Transformers(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s1 := t1.Apply(ctx, stream)
-		s2 := t2.Apply(ctx, s1)
-		s3 := t3.Apply(ctx, s2)
+		s1 := t1.Apply(stream)
+		s2 := t2.Apply(s1)
+		s3 := t3.Apply(s2)
 		_, _ = core.Slice(ctx, s3)
 	}
 }
@@ -300,11 +300,11 @@ func BenchmarkChain_5Transformers(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s1 := t1.Apply(ctx, stream)
-		s2 := t2.Apply(ctx, s1)
-		s3 := t3.Apply(ctx, s2)
-		s4 := t4.Apply(ctx, s3)
-		s5 := t5.Apply(ctx, s4)
+		s1 := t1.Apply(stream)
+		s2 := t2.Apply(s1)
+		s3 := t3.Apply(s2)
+		s4 := t4.Apply(s3)
+		s5 := t5.Apply(s4)
 		_, _ = core.Slice(ctx, s5)
 	}
 }
@@ -323,9 +323,9 @@ func BenchmarkFusion_3Unfused(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s1 := addOne.Apply(ctx, stream)
-		s2 := double.Apply(ctx, s1)
-		s3 := addTen.Apply(ctx, s2)
+		s1 := addOne.Apply(stream)
+		s2 := double.Apply(s1)
+		s3 := addTen.Apply(s2)
 		_, _ = core.Slice(ctx, s3)
 	}
 }
@@ -340,7 +340,7 @@ func BenchmarkFusion_3Fused(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s := fused.Apply(ctx, stream)
+		s := fused.Apply(stream)
 		_, _ = core.Slice(ctx, s)
 	}
 }
@@ -356,11 +356,11 @@ func BenchmarkFusion_5Unfused(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s1 := t1.Apply(ctx, stream)
-		s2 := t2.Apply(ctx, s1)
-		s3 := t3.Apply(ctx, s2)
-		s4 := t4.Apply(ctx, s3)
-		s5 := t5.Apply(ctx, s4)
+		s1 := t1.Apply(stream)
+		s2 := t2.Apply(s1)
+		s3 := t3.Apply(s2)
+		s4 := t4.Apply(s3)
+		s5 := t5.Apply(s4)
 		_, _ = core.Slice(ctx, s5)
 	}
 }
@@ -377,7 +377,7 @@ func BenchmarkFusion_5Fused(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		s := fused.Apply(ctx, stream)
+		s := fused.Apply(stream)
 		_, _ = core.Slice(ctx, s)
 	}
 }

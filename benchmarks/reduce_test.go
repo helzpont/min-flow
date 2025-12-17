@@ -33,7 +33,7 @@ func benchmarkReduceMinFlow(b *testing.B, size int) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		reduced := aggregate.Reduce(add).Apply(ctx, stream)
+		reduced := aggregate.Reduce(add).Apply(stream)
 		_, _ = core.Slice(ctx, reduced)
 	}
 }

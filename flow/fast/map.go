@@ -14,7 +14,7 @@ func Map[IN, OUT any](fn func(IN) OUT) Mapper[IN, OUT] {
 }
 
 // Apply transforms a stream using this Mapper.
-func (m Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+func (m Mapper[IN, OUT]) Apply(s Stream[IN]) Stream[OUT] {
 	return Emitter[OUT](func(ctx context.Context) <-chan OUT {
 		out := make(chan OUT, DefaultBufferSize)
 		go func() {
@@ -41,7 +41,7 @@ func FlatMap[IN, OUT any](fn func(IN) []OUT) FlatMapper[IN, OUT] {
 }
 
 // Apply transforms a stream using this FlatMapper.
-func (m FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
+func (m FlatMapper[IN, OUT]) Apply(s Stream[IN]) Stream[OUT] {
 	return Emitter[OUT](func(ctx context.Context) <-chan OUT {
 		out := make(chan OUT, DefaultBufferSize)
 		go func() {
@@ -79,7 +79,7 @@ type filterTransformer[T any] struct {
 	pred Predicate[T]
 }
 
-func (f filterTransformer[T]) Apply(ctx context.Context, s Stream[T]) Stream[T] {
+func (f filterTransformer[T]) Apply(s Stream[T]) Stream[T] {
 	return Emitter[T](func(ctx context.Context) <-chan T {
 		out := make(chan T, DefaultBufferSize)
 		go func() {

@@ -138,8 +138,8 @@ func Map[IN, OUT any](mapFunc func(IN) (OUT, error)) Mapper[IN, OUT] {
 }
 
 // Apply transforms a stream using this Mapper with default configuration.
-func (m Mapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
-	return m.ApplyWith(ctx, s)
+func (m Mapper[IN, OUT]) Apply(s Stream[IN]) Stream[OUT] {
+	return m.ApplyWith(context.Background(), s)
 }
 
 // ApplyWith transforms a stream using this Mapper with custom options.
@@ -356,8 +356,8 @@ func FlatMap[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) FlatMapper[IN, OU
 }
 
 // Apply transforms a stream using this FlatMapper with default configuration.
-func (fm FlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
-	return fm.ApplyWith(ctx, s)
+func (fm FlatMapper[IN, OUT]) Apply(s Stream[IN]) Stream[OUT] {
+	return fm.ApplyWith(context.Background(), s)
 }
 
 // ApplyWith transforms a stream using this FlatMapper with custom options.
@@ -551,8 +551,8 @@ func IterFlatMapSlice[IN, OUT any](flatMapFunc func(IN) ([]OUT, error)) IterFlat
 }
 
 // Apply transforms a stream using this IterFlatMapper with default configuration.
-func (ifm IterFlatMapper[IN, OUT]) Apply(ctx context.Context, s Stream[IN]) Stream[OUT] {
-	return ifm.ApplyWith(ctx, s)
+func (ifm IterFlatMapper[IN, OUT]) Apply(s Stream[IN]) Stream[OUT] {
+	return ifm.ApplyWith(context.Background(), s)
 }
 
 // ApplyWith transforms a stream using this IterFlatMapper with custom options.

@@ -77,7 +77,7 @@ func TestMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			result := Slice(ctx, Map(tt.fn).Apply(ctx, FromSlice(tt.input)))
+			result := Slice(ctx, Map(tt.fn).Apply(FromSlice(tt.input)))
 
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d elements, got %d", len(tt.expected), len(result))
@@ -106,7 +106,7 @@ func TestFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			result := Slice(ctx, Filter(tt.pred).Apply(ctx, FromSlice(tt.input)))
+			result := Slice(ctx, Filter(tt.pred).Apply(FromSlice(tt.input)))
 
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d elements, got %d", len(tt.expected), len(result))
@@ -128,7 +128,7 @@ func TestFuse(t *testing.T) {
 
 	fused := Fuse(addOne, double)
 
-	result := Slice(ctx, fused.Apply(ctx, FromSlice([]int{1, 2, 3})))
+	result := Slice(ctx, fused.Apply(FromSlice([]int{1, 2, 3})))
 
 	expected := []int{4, 6, 8} // (1+1)*2, (2+1)*2, (3+1)*2
 
@@ -145,7 +145,7 @@ func TestFuse(t *testing.T) {
 func TestReduce(t *testing.T) {
 	ctx := context.Background()
 
-	result := Slice(ctx, Reduce(func(a, b int) int { return a + b }).Apply(ctx, FromSlice([]int{1, 2, 3, 4, 5})))
+	result := Slice(ctx, Reduce(func(a, b int) int { return a + b }).Apply(FromSlice([]int{1, 2, 3, 4, 5})))
 
 	if len(result) != 1 {
 		t.Fatalf("expected 1 element, got %d", len(result))
@@ -158,7 +158,7 @@ func TestReduce(t *testing.T) {
 func TestFold(t *testing.T) {
 	ctx := context.Background()
 
-	result := Slice(ctx, Fold(10, func(acc, v int) int { return acc + v }).Apply(ctx, FromSlice([]int{1, 2, 3, 4, 5})))
+	result := Slice(ctx, Fold(10, func(acc, v int) int { return acc + v }).Apply(FromSlice([]int{1, 2, 3, 4, 5})))
 
 	if len(result) != 1 {
 		t.Fatalf("expected 1 element, got %d", len(result))
@@ -183,7 +183,7 @@ func TestTake(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			result := Slice(ctx, Take[int](tt.n).Apply(ctx, FromSlice(tt.input)))
+			result := Slice(ctx, Take[int](tt.n).Apply(FromSlice(tt.input)))
 
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d elements, got %d", len(tt.expected), len(result))
@@ -212,7 +212,7 @@ func TestSkip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			result := Slice(ctx, Skip[int](tt.n).Apply(ctx, FromSlice(tt.input)))
+			result := Slice(ctx, Skip[int](tt.n).Apply(FromSlice(tt.input)))
 
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d elements, got %d", len(tt.expected), len(result))

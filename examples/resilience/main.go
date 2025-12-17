@@ -42,7 +42,7 @@ func retryExample() {
 	numbers := flow.FromSlice([]int{1, 2, 3, 4, 5})
 
 	// Apply retry - will retry failed operations up to 3 times
-	retried := flowerrors.Retry(3, unreliableOp).Apply(ctx, numbers)
+	retried := flowerrors.Retry(3, unreliableOp).Apply(numbers)
 
 	fmt.Println("Processing with retry:")
 	for res := range retried.All(ctx) {
@@ -73,7 +73,7 @@ func retryWithBackoffExample() {
 
 	// Use exponential backoff: 10ms, 20ms, 40ms...
 	backoff := flowerrors.ExponentialBackoff(10*time.Millisecond, 0)
-	retried := flowerrors.RetryWithBackoff(5, backoff, failingOp).Apply(ctx, numbers)
+	retried := flowerrors.RetryWithBackoff(5, backoff, failingOp).Apply(numbers)
 
 	start := time.Now()
 	for res := range retried.All(ctx) {
@@ -99,10 +99,10 @@ func fallbackExample() {
 	}
 
 	numbers := flow.FromSlice([]int{5, -1, 10, -3, 15})
-	mapped := flow.Map(riskyOp).Apply(ctx, numbers)
+	mapped := flow.Map(riskyOp).Apply(numbers)
 
 	// Use fallback to provide default value on error
-	withFallback := flowerrors.FallbackValue(-999).Apply(ctx, mapped)
+	withFallback := flowerrors.FallbackValue(-999).Apply(mapped)
 
 	fmt.Println("Results with fallback:")
 	for res := range withFallback.All(ctx) {
@@ -142,7 +142,7 @@ func circuitBreakerInterceptorExample() {
 		return ch
 	})
 
-	intercepted := core.Intercept[int]().Apply(ctx, errStream)
+	intercepted := core.Intercept[int]().Apply(errStream)
 
 	successCount := 0
 	errorCount := 0
@@ -190,7 +190,7 @@ func errorCollectorExample() {
 		return ch
 	})
 
-	intercepted := core.Intercept[string]().Apply(ctx, errStream)
+	intercepted := core.Intercept[string]().Apply(errStream)
 
 	// Process stream
 	var values []string

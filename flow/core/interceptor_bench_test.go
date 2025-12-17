@@ -76,7 +76,7 @@ func BenchmarkInterceptor_Baseline(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				ctx := context.Background()
 				stream := makeIntStream(count)
-				mapped := mapper.Apply(ctx, stream)
+				mapped := mapper.Apply(stream)
 				_, _ = Slice(ctx, mapped)
 			}
 		})
@@ -96,9 +96,9 @@ func BenchmarkInterceptor_WithRegistry(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				ctx, _ := WithRegistry(context.Background())
 				stream := makeIntStream(count)
-				mapped := mapper.Apply(ctx, stream)
+				mapped := mapper.Apply(stream)
 				// Add intercept stage
-				intercepted := Intercept[int]().Apply(ctx, mapped)
+				intercepted := Intercept[int]().Apply(mapped)
 				_, _ = Slice(ctx, intercepted)
 			}
 		})
@@ -120,8 +120,8 @@ func BenchmarkInterceptor_SingleInterceptor(b *testing.B) {
 
 				mapper := Map(func(x int) (int, error) { return x * 2, nil })
 				stream := makeIntStream(count)
-				mapped := mapper.Apply(ctx, stream)
-				intercepted := Intercept[int]().Apply(ctx, mapped)
+				mapped := mapper.Apply(stream)
+				intercepted := Intercept[int]().Apply(mapped)
 				_, _ = Slice(ctx, intercepted)
 			}
 		})
@@ -146,8 +146,8 @@ func BenchmarkInterceptor_MultipleInterceptors(b *testing.B) {
 
 				mapper := Map(func(x int) (int, error) { return x * 2, nil })
 				stream := makeIntStream(itemCount)
-				mapped := mapper.Apply(ctx, stream)
-				intercepted := Intercept[int]().Apply(ctx, mapped)
+				mapped := mapper.Apply(stream)
+				intercepted := Intercept[int]().Apply(mapped)
 				_, _ = Slice(ctx, intercepted)
 			}
 		})
@@ -179,8 +179,8 @@ func BenchmarkInterceptor_EventMatching(b *testing.B) {
 
 				mapper := Map(func(x int) (int, error) { return x * 2, nil })
 				stream := makeIntStream(itemCount)
-				mapped := mapper.Apply(ctx, stream)
-				intercepted := Intercept[int]().Apply(ctx, mapped)
+				mapped := mapper.Apply(stream)
+				intercepted := Intercept[int]().Apply(mapped)
 				_, _ = Slice(ctx, intercepted)
 			}
 		})
@@ -286,7 +286,7 @@ func BenchmarkInterceptor_PerItemOverhead(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			ctx := context.Background()
 			stream := makeIntStream(itemCount)
-			mapped := mapper.Apply(ctx, stream)
+			mapped := mapper.Apply(stream)
 			_, _ = Slice(ctx, mapped)
 		}
 	})
@@ -298,8 +298,8 @@ func BenchmarkInterceptor_PerItemOverhead(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			ctx, _ := WithRegistry(context.Background())
 			stream := makeIntStream(itemCount)
-			mapped := mapper.Apply(ctx, stream)
-			intercepted := Intercept[int]().Apply(ctx, mapped)
+			mapped := mapper.Apply(stream)
+			intercepted := Intercept[int]().Apply(mapped)
 			_, _ = Slice(ctx, intercepted)
 		}
 	})
@@ -313,8 +313,8 @@ func BenchmarkInterceptor_PerItemOverhead(b *testing.B) {
 
 			mapper := Map(func(x int) (int, error) { return x * 2, nil })
 			stream := makeIntStream(itemCount)
-			mapped := mapper.Apply(ctx, stream)
-			intercepted := Intercept[int]().Apply(ctx, mapped)
+			mapped := mapper.Apply(stream)
+			intercepted := Intercept[int]().Apply(mapped)
 			_, _ = Slice(ctx, intercepted)
 		}
 	})
@@ -328,8 +328,8 @@ func BenchmarkInterceptor_PerItemOverhead(b *testing.B) {
 
 			mapper := Map(func(x int) (int, error) { return x * 2, nil })
 			stream := makeIntStream(itemCount)
-			mapped := mapper.Apply(ctx, stream)
-			intercepted := Intercept[int]().Apply(ctx, mapped)
+			mapped := mapper.Apply(stream)
+			intercepted := Intercept[int]().Apply(mapped)
 			_, _ = Slice(ctx, intercepted)
 		}
 	})

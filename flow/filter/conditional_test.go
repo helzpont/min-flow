@@ -53,7 +53,7 @@ func TestTakeWhileWithIndex(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.TakeWhileWithIndex(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -123,7 +123,7 @@ func TestSkipWhileWithIndex(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.SkipWhileWithIndex(tt.predicate)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -174,7 +174,7 @@ func TestTakeUntil(t *testing.T) {
 		notifier := flow.FromChannel(notifierCh)
 
 		transformer := filter.TakeUntil[int, int](notifier)
-		result := transformer.Apply(ctx, source)
+		result := transformer.Apply(source)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -193,7 +193,7 @@ func TestTakeUntil(t *testing.T) {
 		notifier := flow.FromSlice([]int{}) // Empty notifier
 
 		transformer := filter.TakeUntil[int, int](notifier)
-		result := transformer.Apply(ctx, source)
+		result := transformer.Apply(source)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -236,7 +236,7 @@ func TestSkipUntil(t *testing.T) {
 		notifier := flow.FromChannel(notifierCh)
 
 		transformer := filter.SkipUntil[int, int](notifier)
-		result := transformer.Apply(ctx, source)
+		result := transformer.Apply(source)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -262,7 +262,7 @@ func TestSkipUntil(t *testing.T) {
 		notifier := flow.FromChannel(notifierCh)
 
 		transformer := filter.SkipUntil[int, int](notifier)
-		result := transformer.Apply(ctx, source)
+		result := transformer.Apply(source)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -319,7 +319,7 @@ func TestElementAt(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.ElementAt[int](tt.index)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -381,7 +381,7 @@ func TestElementAtOrDefault(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.ElementAtOrDefault[int](tt.index, tt.defaultValue)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -403,7 +403,7 @@ func TestSingle(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 3})
 		transformer := filter.Single(func(v int) bool { return v == 2 })
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -417,7 +417,7 @@ func TestSingle(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 3})
 		transformer := filter.Single(func(v int) bool { return v == 10 })
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		results := flow.Collect(ctx, result)
 		if len(results) != 1 || !results[0].IsError() {
 			t.Error("expected error result for no match")
@@ -428,7 +428,7 @@ func TestSingle(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 2, 3})
 		transformer := filter.Single(func(v int) bool { return v == 2 })
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		results := flow.Collect(ctx, result)
 		if len(results) != 1 || !results[0].IsError() {
 			t.Error("expected error result for multiple matches")
@@ -439,7 +439,7 @@ func TestSingle(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{42})
 		transformer := filter.Single[int](nil)
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -453,7 +453,7 @@ func TestSingle(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2})
 		transformer := filter.Single[int](nil)
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		results := flow.Collect(ctx, result)
 		if len(results) != 1 || !results[0].IsError() {
 			t.Error("expected error result for multiple elements with nil predicate")
@@ -466,7 +466,7 @@ func TestSingleOrDefault(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 3})
 		transformer := filter.SingleOrDefault(func(v int) bool { return v == 2 }, -1)
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -480,7 +480,7 @@ func TestSingleOrDefault(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 3})
 		transformer := filter.SingleOrDefault(func(v int) bool { return v == 10 }, 999)
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		got, err := flow.Slice(ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -494,7 +494,7 @@ func TestSingleOrDefault(t *testing.T) {
 		ctx := context.Background()
 		stream := flow.FromSlice([]int{1, 2, 2, 3})
 		transformer := filter.SingleOrDefault(func(v int) bool { return v == 2 }, -1)
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		results := flow.Collect(ctx, result)
 		if len(results) != 1 || !results[0].IsError() {
 			t.Error("expected error result for multiple matches")
@@ -545,7 +545,7 @@ func TestFirstOrDefault(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.FirstOrDefault(tt.predicate, tt.defaultValue)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -600,7 +600,7 @@ func TestLastOrDefault(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			transformer := filter.LastOrDefault(tt.predicate, tt.defaultValue)
-			result := transformer.Apply(ctx, stream)
+			result := transformer.Apply(stream)
 			got, err := flow.Slice(ctx, result)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -619,7 +619,7 @@ func TestContextCancellation(t *testing.T) {
 
 		stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 		transformer := filter.TakeWhileWithIndex(func(int, int) bool { return true })
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		got, _ := flow.Slice(ctx, result)
 		if len(got) > 5 {
 			t.Errorf("expected at most 5 elements, got %d", len(got))
@@ -632,7 +632,7 @@ func TestContextCancellation(t *testing.T) {
 
 		stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 		transformer := filter.ElementAt[int](2)
-		result := transformer.Apply(ctx, stream)
+		result := transformer.Apply(stream)
 		_, _ = flow.Slice(ctx, result)
 		// Just ensure it doesn't hang
 	})

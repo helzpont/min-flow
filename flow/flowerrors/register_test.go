@@ -70,7 +70,7 @@ func TestOnErrorDo(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	// Should have received 2 errors (for 2 and 4)
@@ -99,7 +99,7 @@ func TestWithErrorCounter(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	// Should have counted 2 errors
@@ -131,7 +131,7 @@ func TestWithErrorCounterWithPredicate(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	// Should have counted only 1 error (the specific one)
@@ -157,7 +157,7 @@ func TestWithErrorCollector(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	// Should have collected 2 errors
@@ -187,7 +187,7 @@ func TestWithErrorCollectorMaxErrors(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	// Should have collected only 1 error due to max
@@ -220,7 +220,7 @@ func TestWithCircuitBreakerMonitor(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 	_, _ = core.Slice(ctx, output)
 
 	// Threshold should be hit after 2 consecutive errors (2 and 4 aren't consecutive though)
@@ -253,7 +253,7 @@ func TestWithCircuitBreakerMonitor(t *testing.T) {
 	})
 
 	input2 := testStreamFromSlice([]int{1, 2, 3, 4, 5})
-	output2 := mapper2.Apply(ctx2, input2)
+	output2 := mapper2.Apply(input2)
 	_, _ = core.Slice(ctx2, output2)
 
 	mu2.Lock()

@@ -43,7 +43,7 @@ func TestPairwise(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			pairwise := transform.Pairwise[int]()
-			result := pairwise.Apply(ctx, stream)
+			result := pairwise.Apply(stream)
 
 			got, err := flow.Slice[[2]int](ctx, result)
 			if err != nil {
@@ -102,7 +102,7 @@ func TestStartWith(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			startWith := transform.StartWith(tt.prefix...)
-			result := startWith.Apply(ctx, stream)
+			result := startWith.Apply(stream)
 
 			got, err := flow.Slice[int](ctx, result)
 			if err != nil {
@@ -159,7 +159,7 @@ func TestEndWith(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			endWith := transform.EndWith(tt.suffix...)
-			result := endWith.Apply(ctx, stream)
+			result := endWith.Apply(stream)
 
 			got, err := flow.Slice[int](ctx, result)
 			if err != nil {
@@ -210,7 +210,7 @@ func TestDefaultIfEmpty(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			defaultIfEmpty := transform.DefaultIfEmpty(tt.defaultValue)
-			result := defaultIfEmpty.Apply(ctx, stream)
+			result := defaultIfEmpty.Apply(stream)
 
 			got, err := flow.Slice[int](ctx, result)
 			if err != nil {
@@ -239,7 +239,7 @@ func TestConcatMap(t *testing.T) {
 			return flow.FromSlice([]int{n, n * 10})
 		})
 
-		result := concatMap.Apply(ctx, stream)
+		result := concatMap.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -267,7 +267,7 @@ func TestConcatMap(t *testing.T) {
 			return flow.FromSlice([]int{n})
 		})
 
-		result := concatMap.Apply(ctx, stream)
+		result := concatMap.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -297,7 +297,7 @@ func TestConcatMap(t *testing.T) {
 			return flow.FromSlice([]int{n})
 		})
 
-		result := concatMap.Apply(ctx, stream)
+		result := concatMap.Apply(stream)
 		_, _ = flow.Slice[int](ctx, result)
 
 		// Should have processed at most 2-3 items before cancellation
@@ -316,7 +316,7 @@ func TestMergeMap(t *testing.T) {
 			return flow.FromSlice([]int{n, n * 10})
 		}, 0)
 
-		result := mergeMap.Apply(ctx, stream)
+		result := mergeMap.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -349,7 +349,7 @@ func TestMergeMap(t *testing.T) {
 			return flow.FromSlice([]int{n})
 		}, 2) // Max 2 concurrent
 
-		result := mergeMap.Apply(ctx, stream)
+		result := mergeMap.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -371,7 +371,7 @@ func TestSwitchMap(t *testing.T) {
 			return flow.FromSlice([]int{n * 100})
 		})
 
-		result := switchMap.Apply(ctx, stream)
+		result := switchMap.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -393,7 +393,7 @@ func TestExhaustMap(t *testing.T) {
 			return flow.FromSlice([]int{n, n * 10})
 		})
 
-		result := exhaustMap.Apply(ctx, stream)
+		result := exhaustMap.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -439,7 +439,7 @@ func TestRepeat(t *testing.T) {
 
 			stream := flow.FromSlice(tt.input)
 			repeat := transform.Repeat[int](tt.count)
-			result := repeat.Apply(ctx, stream)
+			result := repeat.Apply(stream)
 
 			got, err := flow.Slice[int](ctx, result)
 			if err != nil {
@@ -463,7 +463,7 @@ func TestRepeat(t *testing.T) {
 
 		stream := flow.FromSlice([]int{1, 2, 3})
 		repeat := transform.Repeat[int](0) // 0 means infinite
-		result := repeat.Apply(ctx, stream)
+		result := repeat.Apply(stream)
 
 		done := make(chan struct{})
 		go func() {
@@ -504,7 +504,7 @@ func TestIgnoreElements(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			ignore := transform.IgnoreElements[int]()
-			result := ignore.Apply(ctx, stream)
+			result := ignore.Apply(stream)
 
 			got, err := flow.Slice[int](ctx, result)
 			if err != nil {
@@ -546,7 +546,7 @@ func TestToSlice(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			toSlice := transform.ToSlice[int]()
-			result := toSlice.Apply(ctx, stream)
+			result := toSlice.Apply(stream)
 
 			got, err := flow.Slice[[]int](ctx, result)
 			if err != nil {
@@ -577,7 +577,7 @@ func TestToMap(t *testing.T) {
 		// ToMap uses keyFn and stores the value itself
 		toMap := transform.ToMap(func(s string) int { return len(s) })
 
-		result := toMap.Apply(ctx, stream)
+		result := toMap.Apply(stream)
 		got, err := flow.Slice[map[int]string](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -600,7 +600,7 @@ func TestToMap(t *testing.T) {
 		// Key by even/odd (0 or 1)
 		toMap := transform.ToMap(func(n int) int { return n % 2 })
 
-		result := toMap.Apply(ctx, stream)
+		result := toMap.Apply(stream)
 		got, err := flow.Slice[map[int]int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -649,7 +649,7 @@ func TestToSet(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			toSet := transform.ToSet[int]()
-			result := toSet.Apply(ctx, stream)
+			result := toSet.Apply(stream)
 
 			got, err := flow.Slice[map[int]struct{}](ctx, result)
 			if err != nil {
@@ -712,7 +712,7 @@ func TestDistinct(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			distinct := transform.Distinct[int]()
-			result := distinct.Apply(ctx, stream)
+			result := distinct.Apply(stream)
 
 			got, err := flow.Slice[int](ctx, result)
 			if err != nil {
@@ -749,7 +749,7 @@ func TestDistinctBy(t *testing.T) {
 
 		stream := flow.FromSlice(input)
 		distinctBy := transform.DistinctBy(func(p person) int { return p.age })
-		result := distinctBy.Apply(ctx, stream)
+		result := distinctBy.Apply(stream)
 
 		got, err := flow.Slice[person](ctx, result)
 		if err != nil {
@@ -797,7 +797,7 @@ func TestWithIndex(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
 			withIndex := transform.WithIndex[string]()
-			result := withIndex.Apply(ctx, stream)
+			result := withIndex.Apply(stream)
 
 			got, err := flow.Slice[transform.Indexed[string]](ctx, result)
 			if err != nil {
@@ -835,7 +835,7 @@ func TestRepeatWhen(t *testing.T) {
 			return flow.FromSlice([]int{}) // Empty = stop
 		})
 
-		result := repeatWhen.Apply(ctx, stream)
+		result := repeatWhen.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil && err != context.DeadlineExceeded {
 			t.Fatalf("unexpected error: %v", err)
@@ -857,7 +857,7 @@ func TestRepeatWhen(t *testing.T) {
 			return flow.FromSlice([]int{}) // Empty = stop immediately
 		})
 
-		result := repeatWhen.Apply(ctx, stream)
+		result := repeatWhen.Apply(stream)
 		got, err := flow.Slice[int](ctx, result)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

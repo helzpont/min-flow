@@ -45,7 +45,7 @@ func TestReduce(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			reduced := aggregate.Reduce(tt.reducer).Apply(ctx, stream)
+			reduced := aggregate.Reduce(tt.reducer).Apply(stream)
 			got, err := flow.Slice[int](ctx, reduced)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -90,7 +90,7 @@ func TestFold(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			folded := aggregate.Fold(tt.initial, tt.folder).Apply(ctx, stream)
+			folded := aggregate.Fold(tt.initial, tt.folder).Apply(stream)
 			got, err := flow.Slice[int](ctx, folded)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -112,7 +112,7 @@ func TestScan(t *testing.T) {
 	// Running sum
 	scanned := aggregate.Scan(0, func(acc, item int) int {
 		return acc + item
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, err := flow.Slice[int](ctx, scanned)
 	if err != nil {
@@ -152,7 +152,7 @@ func TestCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			counted := aggregate.Count[int]().Apply(ctx, stream)
+			counted := aggregate.Count[int]().Apply(stream)
 			got, err := flow.Slice[int](ctx, counted)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -189,7 +189,7 @@ func TestSum(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			summed := aggregate.Sum[int]().Apply(ctx, stream)
+			summed := aggregate.Sum[int]().Apply(stream)
 			got, err := flow.Slice[int](ctx, summed)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -207,7 +207,7 @@ func TestSum(t *testing.T) {
 func TestSumFloats(t *testing.T) {
 	ctx := context.Background()
 	stream := flow.FromSlice([]float64{1.5, 2.5, 3.0})
-	summed := aggregate.Sum[float64]().Apply(ctx, stream)
+	summed := aggregate.Sum[float64]().Apply(stream)
 
 	got, err := flow.Slice[float64](ctx, summed)
 	if err != nil {
@@ -243,7 +243,7 @@ func TestAverage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			averaged := aggregate.Average[int]().Apply(ctx, stream)
+			averaged := aggregate.Average[int]().Apply(stream)
 			got, err := flow.Slice[float64](ctx, averaged)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -285,7 +285,7 @@ func TestMin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			minStream := aggregate.Min(func(a, b int) bool { return a < b }).Apply(ctx, stream)
+			minStream := aggregate.Min(func(a, b int) bool { return a < b }).Apply(stream)
 			got, err := flow.Slice[int](ctx, minStream)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -329,7 +329,7 @@ func TestMax(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			maxStream := aggregate.Max(func(a, b int) bool { return a < b }).Apply(ctx, stream)
+			maxStream := aggregate.Max(func(a, b int) bool { return a < b }).Apply(stream)
 			got, err := flow.Slice[int](ctx, maxStream)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -377,7 +377,7 @@ func TestAll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			allStream := aggregate.All(tt.predicate).Apply(ctx, stream)
+			allStream := aggregate.All(tt.predicate).Apply(stream)
 			got, err := flow.Slice[bool](ctx, allStream)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -423,7 +423,7 @@ func TestAny(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			anyStream := aggregate.Any(tt.predicate).Apply(ctx, stream)
+			anyStream := aggregate.Any(tt.predicate).Apply(stream)
 			got, err := flow.Slice[bool](ctx, anyStream)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -469,7 +469,7 @@ func TestNone(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			stream := flow.FromSlice(tt.input)
-			noneStream := aggregate.None(tt.predicate).Apply(ctx, stream)
+			noneStream := aggregate.None(tt.predicate).Apply(stream)
 			got, err := flow.Slice[bool](ctx, noneStream)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -491,7 +491,7 @@ func TestReduceContextCancellation(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
 	reduced := aggregate.Reduce(func(acc, item int) int {
 		return acc + item
-	}).Apply(ctx, stream)
+	}).Apply(stream)
 
 	got, _ := flow.Slice[int](ctx, reduced)
 	// Should get empty or partial result due to cancellation

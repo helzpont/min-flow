@@ -18,7 +18,7 @@ type Stream[T any] interface {
 
 // Transformer converts a Stream[IN] to a Stream[OUT].
 type Transformer[IN, OUT any] interface {
-	Apply(context.Context, Stream[IN]) Stream[OUT]
+	Apply(Stream[IN]) Stream[OUT]
 }
 
 // Emitter is a function that produces a channel of values.

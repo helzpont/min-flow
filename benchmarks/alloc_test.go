@@ -26,7 +26,7 @@ func BenchmarkAlloc_Map_MinFlow(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(ctx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(ctx, mapped)
 	}
 }

@@ -150,7 +150,7 @@ func TestMapper_AutoInvokesInterceptors(t *testing.T) {
 			input := testStreamFromSlice(tt.input)
 
 			// Apply mapper (should auto-invoke interceptors)
-			output := doubler.Apply(ctx, input)
+			output := doubler.Apply(input)
 
 			// Consume the output to trigger processing
 			_, _ = Slice(ctx, output)
@@ -190,7 +190,7 @@ func TestFlatMapper_AutoInvokesInterceptors(t *testing.T) {
 	input := testStreamFromSlice([]int{1, 2})
 
 	// Apply flatmapper (should auto-invoke interceptors)
-	output := duplicator.Apply(ctx, input)
+	output := duplicator.Apply(input)
 
 	// Consume the output
 	_, _ = Slice(ctx, output)
@@ -239,7 +239,7 @@ func TestMapper_NoRegistryNoEvents(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, 2, 3})
-	output := doubler.Apply(ctx, input)
+	output := doubler.Apply(input)
 
 	// Should still work correctly
 	values, err := Slice(ctx, output)
@@ -276,7 +276,7 @@ func TestDispatch_ErrorOccurred(t *testing.T) {
 	})
 
 	input := testStreamFromSlice([]int{1, -1, 2, -2, 3})
-	output := mapper.Apply(ctx, input)
+	output := mapper.Apply(input)
 
 	// Consume all (errors don't stop the stream)
 	_, _ = Slice(ctx, output)
@@ -305,7 +305,7 @@ func TestIterFlatMapper_AutoInvokesInterceptors(t *testing.T) {
 	input := testStreamFromSlice([]int{1, 2})
 
 	// Apply iter flatmapper (should auto-invoke interceptors)
-	output := duplicator.Apply(ctx, input)
+	output := duplicator.Apply(input)
 
 	// Consume the output
 	_, _ = Slice(ctx, output)
@@ -347,7 +347,7 @@ func TestIntercept_AutoInvokesInterceptors(t *testing.T) {
 	input := testStreamFromSlice([]int{1, 2, 3})
 
 	// Apply Intercept transmitter
-	output := Intercept[int]().Apply(ctx, input)
+	output := Intercept[int]().Apply(input)
 
 	// Consume the output
 	_, _ = Slice(ctx, output)
@@ -381,7 +381,7 @@ func TestIntercept_PassthroughWithoutRegistry(t *testing.T) {
 	ctx := context.Background() // No registry
 
 	input := testStreamFromSlice([]int{1, 2, 3})
-	output := Intercept[int]().Apply(ctx, input)
+	output := Intercept[int]().Apply(input)
 
 	values, err := Slice(ctx, output)
 	if err != nil {

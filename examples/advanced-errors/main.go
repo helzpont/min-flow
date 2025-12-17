@@ -48,7 +48,7 @@ func retryWithJitterExample() {
 	// Exponential backoff: 10ms * 2^attempt, with jitter, max 500ms
 	backoff := flowerrors.ExponentialBackoff(10*time.Millisecond, 500*time.Millisecond)
 
-	retried := flowerrors.RetryWithBackoff(5, backoff, flakyMultiplier).Apply(ctx, ids)
+	retried := flowerrors.RetryWithBackoff(5, backoff, flakyMultiplier).Apply(ids)
 
 	fmt.Println("Processing with exponential backoff:")
 	start := time.Now()
@@ -90,8 +90,8 @@ func circuitBreakerExample() {
 	// First batch: will trigger circuit breaker
 	fmt.Println("First batch (should trigger circuit breaker):")
 	numbers1 := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
-	processed1 := core.Intercept[int]().Apply(ctx,
-		flow.Map(failingService).Apply(ctx, numbers1))
+	processed1 := core.Intercept[int]().Apply(
+		flow.Map(failingService).Apply(numbers1))
 
 	for res := range processed1.All(ctx) {
 		if res.IsError() {
@@ -126,8 +126,8 @@ func fallbackWithTransformerExample() {
 	numbers := flow.FromSlice([]int{1, 2, 3, 4, 5, 6})
 
 	// Apply service, then use Fallback transformer to handle errors
-	processed := flow.Map(failingService).Apply(ctx, numbers)
-	withFallback := flowerrors.Fallback(fallbackFn).Apply(ctx, processed)
+	processed := flow.Map(failingService).Apply(numbers)
+	withFallback := flowerrors.Fallback(fallbackFn).Apply(processed)
 
 	fmt.Println("Results with fallback:")
 	for res := range withFallback.All(ctx) {
@@ -152,7 +152,7 @@ func errorAggregationExample() {
 	// Process some items, some of which will fail
 	items := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-	processed := core.Intercept[int]().Apply(ctxWithRegistry,
+	processed := core.Intercept[int]().Apply(
 		flow.Map(func(n int) (int, error) {
 			if n%3 == 0 {
 				return 0, fmt.Errorf("divisible by 3: %d", n)
@@ -161,7 +161,7 @@ func errorAggregationExample() {
 				return 0, fmt.Errorf("divisible by 5: %d", n)
 			}
 			return n * 10, nil
-		}).Apply(ctxWithRegistry, items))
+		}).Apply(items))
 
 	// Consume the stream
 	var successCount int
@@ -224,7 +224,7 @@ func partialFailureExample() {
 			Output:  "processed-" + item,
 			Success: true,
 		}}, nil
-	}).Apply(ctx, items)
+	}).Apply(items)
 
 	// Separate successes and failures
 	var successes, failures []ProcessResult

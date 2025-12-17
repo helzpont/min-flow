@@ -60,7 +60,7 @@ func multiSourceAggregation(url1, url2 string) {
 			return nil, err
 		}
 		return products, nil
-	}).Apply(ctx, source1)
+	}).Apply(source1)
 
 	products2 := flow.FlatMap(func(resp flowhttp.Response) ([]Product, error) {
 		var products []Product
@@ -68,7 +68,7 @@ func multiSourceAggregation(url1, url2 string) {
 			return nil, err
 		}
 		return products, nil
-	}).Apply(ctx, source2)
+	}).Apply(source2)
 
 	// Merge products from both sources
 	allProducts := combine.Merge(products1, products2)
@@ -76,12 +76,12 @@ func multiSourceAggregation(url1, url2 string) {
 	// Filter to in-stock items only
 	inStock := filter.Where(func(p Product) bool {
 		return p.InStock
-	}).Apply(ctx, allProducts)
+	}).Apply(allProducts)
 
 	// Filter by price range
 	affordable := filter.Where(func(p Product) bool {
 		return p.Price <= 100
-	}).Apply(ctx, inStock)
+	}).Apply(inStock)
 
 	fmt.Println("In-stock products under $100:")
 	for res := range affordable.All(ctx) {
@@ -136,7 +136,7 @@ func parallelFetching() {
 			StatusCode: resp.StatusCode,
 			Body:       body[:n],
 		}
-	}).Apply(ctx, urls)
+	}).Apply(urls)
 
 	var count int
 	for res := range responses.All(ctx) {
@@ -174,7 +174,7 @@ func streamingAPI() {
 	lines := flowhttp.GetLines(server.URL)
 
 	// Parse each JSON line into a Product
-	products := flowjson.Decode[Product]().Apply(ctx, lines)
+	products := flowjson.Decode[Product]().Apply(lines)
 
 	fmt.Println("Streaming products:")
 	for res := range products.All(ctx) {
@@ -229,7 +229,7 @@ func retryFetchExample() {
 
 	// Retry up to 5 times with backoff
 	backoff := flowerrors.ExponentialBackoff(50*time.Millisecond, 1*time.Second)
-	results := flowerrors.RetryWithBackoff(5, backoff, fetcher).Apply(ctx, urls)
+	results := flowerrors.RetryWithBackoff(5, backoff, fetcher).Apply(urls)
 
 	for res := range results.All(ctx) {
 		if res.IsError() {

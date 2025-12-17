@@ -30,7 +30,7 @@ func main() {
 	start := time.Now()
 	sequential := flow.Map(func(n int) (int, error) {
 		return heavyComputation(n), nil
-	}).Apply(ctx, numbers)
+	}).Apply(numbers)
 	seqResults, _ := flow.Slice(ctx, sequential)
 	seqDuration := time.Since(start)
 	fmt.Printf("Sequential: %v in %v\n", seqResults, seqDuration)
@@ -38,7 +38,7 @@ func main() {
 	// Parallel processing (fast)
 	numbers2 := flow.Range(1, 10)
 	start = time.Now()
-	par := parallel.Map(4, heavyComputation).Apply(ctx, numbers2)
+	par := parallel.Map(4, heavyComputation).Apply(numbers2)
 	parResults, _ := flow.Slice(ctx, par)
 	parDuration := time.Since(start)
 	fmt.Printf("Parallel (4 workers): %v in %v\n", parResults, parDuration)
@@ -46,7 +46,7 @@ func main() {
 	// Parallel ordered (maintains input order)
 	numbers3 := flow.Range(1, 10)
 	start = time.Now()
-	ordered := parallel.Ordered(4, heavyComputation).Apply(ctx, numbers3)
+	ordered := parallel.Ordered(4, heavyComputation).Apply(numbers3)
 	ordResults, _ := flow.Slice(ctx, ordered)
 	ordDuration := time.Since(start)
 	fmt.Printf("Parallel ordered: %v in %v\n", ordResults, ordDuration)
@@ -66,7 +66,7 @@ func main() {
 		p := flow.Map(func(n int) (int, error) {
 			fmt.Printf("  Worker %d processing %d\n", workerID, n)
 			return n * 10, nil
-		}).Apply(ctx, s)
+		}).Apply(s)
 		processed = append(processed, p)
 	}
 
