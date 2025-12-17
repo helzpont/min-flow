@@ -4,14 +4,14 @@ This guide explains when and how to observe stream processing in min-flow. Choos
 
 ## Quick Reference
 
-| Use Case | Approach | Package |
-|----------|----------|---------|
-| Count values/errors for a specific type | `observe.WithCounter[T]()` | observe |
-| Log all stream events | `observe.WithLogging[T]()` | observe |
-| Collect errors for analysis | `observe.WithErrorCollector[T]()` or `flowerrors.WithErrorCollector[T]()` | observe/flowerrors |
-| Custom per-value callback | `observe.WithValueHook[T]()` | observe |
-| Monitor error rates | `flowerrors.WithCircuitBreakerMonitor[T]()` | flowerrors |
-| Full custom observation | `core.WithHooks[T]()` | core |
+| Use Case                                | Approach                                                                  | Package            |
+| --------------------------------------- | ------------------------------------------------------------------------- | ------------------ |
+| Count values/errors for a specific type | `observe.WithCounter[T]()`                                                | observe            |
+| Log all stream events                   | `observe.WithLogging[T]()`                                                | observe            |
+| Collect errors for analysis             | `observe.WithErrorCollector[T]()` or `flowerrors.WithErrorCollector[T]()` | observe/flowerrors |
+| Custom per-value callback               | `observe.WithValueHook[T]()`                                              | observe            |
+| Monitor error rates                     | `flowerrors.WithCircuitBreakerMonitor[T]()`                               | flowerrors         |
+| Full custom observation                 | `core.WithHooks[T]()`                                                     | core               |
 
 ## Observation Methods
 
