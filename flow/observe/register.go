@@ -8,226 +8,99 @@ import (
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
-// This file provides convenience functions for registering interceptor-based observers.
-// These functions create interceptors and register them with a Registry, returning
-// the context with the registry attached. Since transformers now auto-invoke interceptors,
-// these registered observers will automatically receive events without needing explicit
-// pipeline stages.
+// This file provides convenience functions for creating typed hooks-based observers.
+// The hooks system is type-parameterized, so observers must be registered with
+// the specific type they want to observe.
 //
 // Usage pattern:
 //
-//	ctx, registry := core.WithRegistry(context.Background())
-//	observe.OnValue(registry, func(v any) { fmt.Println("Value:", v) })
-//	observe.OnError(registry, func(err error) { log.Error(err) })
-//	observe.OnComplete(registry, func() { fmt.Println("Done!") })
+//	// Create typed hooks for int streams
+//	ctx := WithValueHook(ctx, func(v int) { fmt.Println("Value:", v) })
+//	ctx = WithErrorHook(ctx, func(err error) { log.Error(err) })
 //
-//	// Stream processing automatically invokes registered observers
+//	// Stream processing automatically invokes registered hooks
 //	result := someMapper.Apply(ctx, stream)
 
-// compositeInterceptor accumulates multiple callbacks and invokes them for events.
-// It supports adding callbacks after creation, unlike CallbackInterceptor.
-type compositeInterceptor struct {
-	mu         sync.RWMutex
-	onValue    []func(any)
-	onError    []func(error)
-	onStart    []func()
-	onComplete []func()
+// WithValueHook attaches a value observation hook for type T to the context.
+// The callback fires for each successful value emitted.
+func WithValueHook[T any](ctx context.Context, callback func(T)) context.Context {
+	return core.WithHooks(ctx, core.Hooks[T]{
+		OnValue: callback,
+	})
 }
 
-func (c *compositeInterceptor) Init() error  { return nil }
-func (c *compositeInterceptor) Close() error { return nil }
-
-func (c *compositeInterceptor) Events() []core.Event {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	var events []core.Event
-	if len(c.onStart) > 0 {
-		events = append(events, core.StreamStart)
-	}
-	if len(c.onComplete) > 0 {
-		events = append(events, core.StreamEnd)
-	}
-	if len(c.onValue) > 0 {
-		events = append(events, core.ValueReceived)
-	}
-	if len(c.onError) > 0 {
-		events = append(events, core.ErrorOccurred)
-	}
-	return events
+// WithErrorHook attaches an error observation hook for type T to the context.
+// The callback fires for each error encountered.
+func WithErrorHook[T any](ctx context.Context, callback func(error)) context.Context {
+	return core.WithHooks(ctx, core.Hooks[T]{
+		OnError: callback,
+	})
 }
 
-func (c *compositeInterceptor) Do(ctx context.Context, event core.Event, args ...any) error {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	switch event {
-	case core.StreamStart:
-		for _, fn := range c.onStart {
-			fn()
-		}
-	case core.StreamEnd:
-		for _, fn := range c.onComplete {
-			fn()
-		}
-	case core.ValueReceived:
-		var value any
-		if len(args) > 0 {
-			value = args[0]
-		}
-		for _, fn := range c.onValue {
-			fn(value)
-		}
-	case core.ErrorOccurred:
-		if len(args) > 0 {
-			if err, ok := args[0].(error); ok {
-				for _, fn := range c.onError {
-					fn(err)
-				}
-			}
-		}
-	}
-	return nil
+// WithStartHook attaches a stream start hook for type T to the context.
+// The callback fires when the stream starts processing.
+func WithStartHook[T any](ctx context.Context, callback func()) context.Context {
+	return core.WithHooks(ctx, core.Hooks[T]{
+		OnStart: callback,
+	})
 }
 
-// getOrCreateComposite retrieves the shared compositeInterceptor from the registry,
-// or creates and registers one if it doesn't exist.
-func getOrCreateComposite(registry *core.Registry) (*compositeInterceptor, error) {
-	// Check if already registered
-	if existing := registry.Get("*observe.compositeInterceptor"); existing != nil {
-		return existing.(*compositeInterceptor), nil
-	}
-
-	// Create and register new composite
-	composite := &compositeInterceptor{}
-	if err := registry.Register(composite); err != nil {
-		// Another goroutine may have registered it - try to get it
-		if existing := registry.Get("*observe.compositeInterceptor"); existing != nil {
-			return existing.(*compositeInterceptor), nil
-		}
-		return nil, err
-	}
-	return composite, nil
+// WithCompleteHook attaches a stream completion hook for type T to the context.
+// The callback fires when the stream completes.
+func WithCompleteHook[T any](ctx context.Context, callback func()) context.Context {
+	return core.WithHooks(ctx, core.Hooks[T]{
+		OnComplete: callback,
+	})
 }
 
-// OnValue registers a callback that fires for each successful value in any stream.
-// The callback receives the value as `any` since interceptors are not generic.
-// Multiple callbacks can be registered and all will be invoked.
-func OnValue(registry *core.Registry, callback func(any)) error {
-	composite, err := getOrCreateComposite(registry)
-	if err != nil {
-		return err
-	}
-	composite.mu.Lock()
-	composite.onValue = append(composite.onValue, callback)
-	composite.mu.Unlock()
-	return nil
+// WithSentinelHook attaches a sentinel observation hook for type T to the context.
+// The callback fires for each sentinel value encountered.
+func WithSentinelHook[T any](ctx context.Context, callback func(error)) context.Context {
+	return core.WithHooks(ctx, core.Hooks[T]{
+		OnSentinel: callback,
+	})
 }
 
-// OnError registers a callback that fires for each error in any stream.
-// Multiple callbacks can be registered and all will be invoked.
-func OnError(registry *core.Registry, callback func(error)) error {
-	composite, err := getOrCreateComposite(registry)
-	if err != nil {
-		return err
-	}
-	composite.mu.Lock()
-	composite.onError = append(composite.onError, callback)
-	composite.mu.Unlock()
-	return nil
+// Counter provides thread-safe counting of values and errors.
+type Counter struct {
+	values atomic.Int64
+	errors atomic.Int64
 }
 
-// OnStart registers a callback that fires when any stream starts processing.
-// Multiple callbacks can be registered and all will be invoked.
-func OnStart(registry *core.Registry, callback func()) error {
-	composite, err := getOrCreateComposite(registry)
-	if err != nil {
-		return err
-	}
-	composite.mu.Lock()
-	composite.onStart = append(composite.onStart, callback)
-	composite.mu.Unlock()
-	return nil
+// Values returns the count of values processed.
+func (c *Counter) Values() int64 { return c.values.Load() }
+
+// Errors returns the count of errors encountered.
+func (c *Counter) Errors() int64 { return c.errors.Load() }
+
+// Total returns the total count of values and errors.
+func (c *Counter) Total() int64 { return c.values.Load() + c.errors.Load() }
+
+// WithCounter attaches counting hooks for type T and returns the counter for querying.
+func WithCounter[T any](ctx context.Context) (context.Context, *Counter) {
+	counter := &Counter{}
+	ctx = core.WithHooks(ctx, core.Hooks[T]{
+		OnValue: func(T) { counter.values.Add(1) },
+		OnError: func(error) { counter.errors.Add(1) },
+	})
+	return ctx, counter
 }
 
-// OnComplete registers a callback that fires when any stream completes.
-// Multiple callbacks can be registered and all will be invoked.
-func OnComplete(registry *core.Registry, callback func()) error {
-	composite, err := getOrCreateComposite(registry)
-	if err != nil {
-		return err
-	}
-	composite.mu.Lock()
-	composite.onComplete = append(composite.onComplete, callback)
-	composite.mu.Unlock()
-	return nil
-}
-
-// WithMetrics registers a MetricsInterceptor and returns it for querying.
-// The onComplete callback is called when any stream ends.
-func WithMetrics(registry *core.Registry, onComplete func(StreamMetrics)) (*MetricsInterceptor, error) {
-	interceptor := NewMetricsInterceptor(onComplete)
-	if err := registry.Register(interceptor); err != nil {
-		return nil, err
-	}
-	return interceptor, nil
-}
-
-// WithLiveMetrics registers a LiveMetricsInterceptor and returns the LiveMetrics for querying.
-func WithLiveMetrics(registry *core.Registry) (*LiveMetrics, error) {
-	metrics := &LiveMetrics{}
-	interceptor := NewLiveMetricsInterceptor(metrics)
-	if err := registry.Register(interceptor); err != nil {
-		return nil, err
-	}
-	return metrics, nil
-}
-
-// WithCounter registers a CounterInterceptor and returns it for querying.
-func WithCounter(registry *core.Registry) (*CounterInterceptor, error) {
-	counter := NewCounterInterceptor()
-	if err := registry.Register(counter); err != nil {
-		return nil, err
-	}
-	return counter, nil
-}
-
-// WithLogging registers a LogInterceptor with the given logger.
-// If no events are specified, all events are logged.
-func WithLogging(registry *core.Registry, logger func(format string, args ...any), events ...core.Event) error {
-	interceptor := NewLogInterceptor(logger, events...)
-	return registry.Register(interceptor)
-}
-
-// ValueCounter is a simple atomic counter for values that can be registered as an interceptor.
+// ValueCounter counts only values.
 type ValueCounter struct {
 	count atomic.Int64
 }
 
 // Count returns the current count.
-func (c *ValueCounter) Count() int64 {
-	return c.count.Load()
-}
+func (c *ValueCounter) Count() int64 { return c.count.Load() }
 
-func (c *ValueCounter) Init() error  { return nil }
-func (c *ValueCounter) Close() error { return nil }
-
-func (c *ValueCounter) Events() []core.Event {
-	return []core.Event{core.ValueReceived}
-}
-
-func (c *ValueCounter) Do(ctx context.Context, event core.Event, args ...any) error {
-	c.count.Add(1)
-	return nil
-}
-
-// WithValueCounter registers a simple value counter and returns it for querying.
-func WithValueCounter(registry *core.Registry) (*ValueCounter, error) {
+// WithValueCounter attaches a value counting hook for type T and returns the counter.
+func WithValueCounter[T any](ctx context.Context) (context.Context, *ValueCounter) {
 	counter := &ValueCounter{}
-	if err := registry.Register(counter); err != nil {
-		return nil, err
-	}
-	return counter, nil
+	ctx = core.WithHooks(ctx, core.Hooks[T]{
+		OnValue: func(T) { counter.count.Add(1) },
+	})
+	return ctx, counter
 }
 
 // ErrorCollector collects all errors encountered in streams.
@@ -259,29 +132,39 @@ func (c *ErrorCollector) Count() int {
 	return len(c.errors)
 }
 
-func (c *ErrorCollector) Init() error  { return nil }
-func (c *ErrorCollector) Close() error { return nil }
-
-func (c *ErrorCollector) Events() []core.Event {
-	return []core.Event{core.ErrorOccurred}
-}
-
-func (c *ErrorCollector) Do(ctx context.Context, event core.Event, args ...any) error {
-	if len(args) > 0 {
-		if err, ok := args[0].(error); ok {
-			c.mu.Lock()
-			c.errors = append(c.errors, err)
-			c.mu.Unlock()
-		}
-	}
-	return nil
-}
-
-// WithErrorCollector registers an error collector and returns it for querying.
-func WithErrorCollector(registry *core.Registry) (*ErrorCollector, error) {
+// WithErrorCollector attaches an error collecting hook for type T and returns the collector.
+func WithErrorCollector[T any](ctx context.Context) (context.Context, *ErrorCollector) {
 	collector := &ErrorCollector{}
-	if err := registry.Register(collector); err != nil {
-		return nil, err
-	}
-	return collector, nil
+	ctx = core.WithHooks(ctx, core.Hooks[T]{
+		OnError: func(err error) {
+			collector.mu.Lock()
+			collector.errors = append(collector.errors, err)
+			collector.mu.Unlock()
+		},
+	})
+	return ctx, collector
+}
+
+// Logger is a function type for logging messages.
+type Logger func(format string, args ...any)
+
+// WithLogging attaches logging hooks for type T to the context.
+func WithLogging[T any](ctx context.Context, logger Logger) context.Context {
+	return core.WithHooks(ctx, core.Hooks[T]{
+		OnStart: func() {
+			logger("stream started")
+		},
+		OnValue: func(v T) {
+			logger("value: %v", v)
+		},
+		OnError: func(err error) {
+			logger("error: %v", err)
+		},
+		OnSentinel: func(err error) {
+			logger("sentinel: %v", err)
+		},
+		OnComplete: func() {
+			logger("stream completed")
+		},
+	})
 }

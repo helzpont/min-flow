@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"sync"
 )
 
 // Hooks holds typed observation callbacks for a stream.
@@ -182,9 +181,7 @@ func (h *hookInvoker[T]) hasAny() bool {
 // Use this when hooks are user-provided and panics should not crash the pipeline.
 type SafeHooks[T any] struct {
 	Hooks[T]
-	mu            sync.Mutex
-	panicHandler  func(any) // Called when a hook panics
-	panicRecovery bool
+	panicHandler func(any) // Called when a hook panics
 }
 
 // NewSafeHooks creates SafeHooks from regular Hooks.
@@ -195,8 +192,7 @@ func NewSafeHooks[T any](hooks Hooks[T], panicHandler func(any)) SafeHooks[T] {
 	}
 
 	safe := SafeHooks[T]{
-		panicHandler:  panicHandler,
-		panicRecovery: true,
+		panicHandler: panicHandler,
 	}
 
 	// Wrap each hook with panic recovery

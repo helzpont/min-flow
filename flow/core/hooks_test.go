@@ -265,9 +265,9 @@ func TestHookInvoker(t *testing.T) {
 
 	t.Run("caches hook existence flags", func(t *testing.T) {
 		ctx := WithHooks(context.Background(), Hooks[int]{
-			OnStart:  func() {},
-			OnValue:  func(v int) {},
-			OnError:  func(err error) {},
+			OnStart: func() {},
+			OnValue: func(v int) {},
+			OnError: func(err error) {},
 		})
 
 		invoker := newHookInvoker[int](ctx)
