@@ -1,213 +1,216 @@
 # observe
 
-The `observe` package provides operators for monitoring, debugging, and collecting metrics from streams without affecting their behavior.
+The `observe` package provides typed hooks for monitoring, debugging, and collecting metrics from streams without affecting their behavior.
 
 ## Overview
 
-Observability is crucial for understanding stream behavior in production. This package offers two approaches:
+Observability is crucial for understanding stream behavior in production. This package provides **typed hooks** that attach to context and fire automatically during stream processing.
 
-1. **Interceptor-based (Recommended)**: Register observers with a registry, and they're automatically invoked by all stream operations
-2. **Transformer-based (Deprecated)**: Explicit pipeline stages for observation
-
-The interceptor-based approach is preferred because:
-
-- No pipeline overhead - observers don't add stages to your stream
-- Global visibility - see all events across the entire pipeline
-- Simpler code - register once, observe everywhere
+Key benefits:
+- **Type-safe**: Hooks are parameterized by stream element type
+- **Zero pipeline overhead**: Hooks don't add stages to your stream
+- **Context-based**: Attach hooks to context, they propagate automatically
+- **Composable**: Multiple hooks of different types can coexist
 
 ```mermaid
 graph LR
-    subgraph "Interceptor-Based (Recommended)"
-        Registry[Registry] --> I1[OnValue]
-        Registry --> I2[OnError]
-        Registry --> I3[Metrics]
+    subgraph "Typed Hooks"
+        Context[Context] --> H1[ValueHook]
+        Context --> H2[ErrorHook]
+        Context --> H3[Counter]
         Source[Stream] --> Mapper[Mapper]
-        Mapper -.->|auto-invoke| Registry
+        Mapper -.->|auto-invoke| Context
         Mapper --> Output[Output]
     end
 ```
 
-## Quick Start: Interceptor-Based Observation
+## Quick Start
 
 ```go
-// Set up registry and observers
-ctx, registry := core.WithRegistry(context.Background())
+import (
+    "context"
+    "fmt"
+    
+    "github.com/lguimbarda/min-flow/flow"
+    "github.com/lguimbarda/min-flow/flow/observe"
+)
 
-// Register observers - they'll be called automatically
-observe.OnValue(registry, func(v any) {
-    fmt.Printf("Value: %v\n", v)
-})
-observe.OnError(registry, func(err error) {
-    log.Printf("Error: %v", err)
-})
-observe.OnComplete(registry, func() {
-    fmt.Println("Stream completed")
-})
+func main() {
+    ctx := context.Background()
 
-// Process stream - observers fire automatically!
-result := mapper.Apply(ctx, stream)
-values, _ := core.Slice(ctx, result)
+    // Attach typed hooks to context
+    ctx, counter := observe.WithCounter[int](ctx)
+    ctx = observe.WithValueHook(ctx, func(v int) {
+        fmt.Printf("Value: %d\n", v)
+    })
+    ctx = observe.WithErrorHook(ctx, func(err error) {
+        fmt.Printf("Error: %v\n", err)
+    })
+
+    // Process stream - hooks fire automatically during Emit()
+    stream := flow.FromSlice([]int{1, 2, 3, 4, 5})
+    doubled := flow.Map(func(n int) (int, error) {
+        return n * 2, nil
+    }).Apply(stream)
+
+    _, _ = flow.Slice(ctx, doubled)
+    fmt.Printf("Processed %d items\n", counter.Load())
+}
 ```
 
-## Registration Functions
+## Hook Registration Functions
 
-### Basic Callbacks
+### Value Observation
 
 ```go
-// Observe values
-observe.OnValue(registry, func(v any) {
+// Observe each value with a callback
+ctx = observe.WithValueHook(ctx, func(v int) {
     fmt.Println("Got value:", v)
 })
 
-// Observe errors
-observe.OnError(registry, func(err error) {
-    log.Error("Stream error:", err)
-})
+// Count all values processed
+ctx, counter := observe.WithCounter[int](ctx)
+// Later: counter.Load() returns total count
 
-// Observe stream lifecycle
-observe.OnStart(registry, func() {
-    fmt.Println("Stream started")
-})
-observe.OnComplete(registry, func() {
-    fmt.Println("Stream completed")
+// Count values matching a condition
+ctx, counter := observe.WithValueCounter(ctx, func(v int) bool {
+    return v > 10  // Only count values > 10
 })
 ```
 
-### Metrics Collection
+### Error Observation
 
 ```go
-// Counter - counts values, errors, sentinels
-counter, _ := observe.WithCounter(registry)
-// Later: counter.Values(), counter.Errors(), counter.Total()
-
-// Simple value counter
-valueCounter, _ := observe.WithValueCounter(registry)
-// Later: valueCounter.Count()
-
-// Error collector
-collector, _ := observe.WithErrorCollector(registry)
-// Later: collector.Errors(), collector.HasErrors()
-
-// Metrics with callback on completion
-metrics, _ := observe.WithMetrics(registry, func(m observe.StreamMetrics) {
-    fmt.Printf("Processed %d items in %v\n", m.TotalItems, m.Duration)
+// Observe each error with a callback
+ctx = observe.WithErrorHook(ctx, func(err error) {
+    log.Printf("Stream error: %v", err)
 })
-
-// Live metrics (query anytime)
-liveMetrics, _ := observe.WithLiveMetrics(registry)
-// Later: liveMetrics.ItemCount(), liveMetrics.ErrorCount()
 ```
 
 ### Logging
 
 ```go
-// Log specific events
-observe.WithLogging(registry, log.Printf, core.ValueReceived, core.ErrorOccurred)
-
-// Log all events
-observe.WithLogging(registry, log.Printf)
+// Log stream events with a custom logger
+ctx = observe.WithLogging[int](ctx, func(format string, args ...any) {
+    log.Printf(format, args...)
+})
 ```
 
-## Built-in Interceptors
-
-For more control, use the interceptor types directly:
+### Composite Hooks
 
 ```go
-// Metrics interceptor with callback
-metrics := observe.NewMetricsInterceptor(func(m observe.StreamMetrics) {
-    fmt.Printf("Total: %d, Errors: %d, Duration: %v\n",
-        m.TotalItems, m.ErrorCount, m.Duration)
+// Combine multiple observations in one call
+ctx, counter := observe.WithObserver(ctx, observe.ObserverConfig[int]{
+    OnValue: func(v int) { fmt.Printf("Value: %d\n", v) },
+    OnError: func(err error) { log.Printf("Error: %v", err) },
 })
-registry.Register(metrics)
-
-// Counter interceptor
-counter := observe.NewCounterInterceptor()
-registry.Register(counter)
-// Query: counter.Values(), counter.Errors(), counter.Sentinels()
-
-// Callback interceptor for custom handling
-callback := observe.NewCallbackInterceptor(
-    observe.WithOnValue(func(v any) { /* handle value */ }),
-    observe.WithOnError(func(err error) { /* handle error */ }),
-    observe.WithOnStart(func() { /* handle start */ }),
-    observe.WithOnComplete(func() { /* handle complete */ }),
-)
-registry.Register(callback)
-
-// Log interceptor
-logger := observe.NewLogInterceptor(log.Printf, core.ValueReceived, core.ErrorOccurred)
-registry.Register(logger)
 ```
 
-## StreamMetrics
+## Low-Level Hooks API
 
-The metrics interceptors collect:
+For full control, use the core package directly:
 
-| Metric           | Description           |
-| ---------------- | --------------------- |
-| `TotalItems`     | Total items processed |
-| `ValueCount`     | Successful values     |
-| `ErrorCount`     | Error results         |
-| `SentinelCount`  | Sentinel signals      |
-| `StartTime`      | When stream started   |
-| `EndTime`        | When stream ended     |
-| `Duration`       | Total processing time |
-| `ItemsPerSecond` | Throughput            |
+```go
+import "github.com/lguimbarda/min-flow/flow/core"
 
-## Data Flow with Interceptors
+ctx = core.WithHooks(ctx, core.Hooks[int]{
+    OnValue:       func(v int) { /* called per value */ },
+    OnError:       func(err error) { /* called per error */ },
+    OnStreamStart: func() { /* called when stream starts */ },
+    OnStreamEnd:   func() { /* called when stream ends */ },
+})
+```
+
+## Hook Composition
+
+Multiple hooks of the same type are merged - all callbacks fire:
+
+```go
+ctx := context.Background()
+
+// First value hook
+ctx = observe.WithValueHook(ctx, func(v int) {
+    fmt.Println("Hook 1:", v)
+})
+
+// Second value hook - both will fire
+ctx = observe.WithValueHook(ctx, func(v int) {
+    fmt.Println("Hook 2:", v)
+})
+```
+
+Different typed hooks coexist independently:
+
+```go
+ctx := context.Background()
+ctx, intCounter := observe.WithCounter[int](ctx)
+ctx, strCounter := observe.WithCounter[string](ctx)
+
+// intCounter tracks int streams, strCounter tracks string streams
+```
+
+## Data Flow with Hooks
 
 ```mermaid
 sequenceDiagram
     participant S as Source
     participant M as Mapper
-    participant R as Registry
+    participant H as Hooks (in Context)
     participant O as Output
 
-    Note over R: OnValue, OnError, Metrics registered
+    Note over H: ValueHook, ErrorHook attached
 
     S->>M: value(1)
-    M->>R: invoke(ValueReceived, 2)
-    R-->>R: OnValue callback
-    R-->>R: Metrics.count++
+    M->>H: OnValue(2)
+    H-->>H: ValueHook callback
+    H-->>H: Counter increment
     M->>O: value(2)
 
     S->>M: error
-    M->>R: invoke(ErrorOccurred, err)
-    R-->>R: OnError callback
-    R-->>R: Metrics.errors++
+    M->>H: OnError(err)
+    H-->>H: ErrorHook callback
     M->>O: error
 
     S->>M: complete
-    M->>R: invoke(StreamEnd)
-    R-->>R: OnComplete callback
+    M->>H: OnStreamEnd()
     M->>O: complete
 ```
 
-## Deprecated Transformer-Based Operators
+## Error Tracking
 
-The following operators are deprecated. Use the interceptor-based alternatives:
+For specialized error tracking, see the `flowerrors` package:
 
-| Deprecated                  | Use Instead                        |
-| --------------------------- | ---------------------------------- |
-| `DoOnNext[T](handler)`      | `OnValue(registry, handler)`       |
-| `DoOnError[T](handler)`     | `OnError(registry, handler)`       |
-| `DoOnComplete[T](handler)`  | `OnComplete(registry, handler)`    |
-| `DoOnSubscribe[T](handler)` | `OnStart(registry, handler)`       |
-| `Tap[T](handlers)`          | `OnValue`, `OnError`, `OnComplete` |
-| `Meter[T](callback)`        | `WithMetrics(registry, callback)`  |
-| `MeterLive[T](metrics)`     | `WithLiveMetrics(registry)`        |
-| `CountValues[T](callback)`  | `WithCounter(registry)`            |
-| `Log[T](formatter, logger)` | `WithLogging(registry, logger)`    |
+```go
+import "github.com/lguimbarda/min-flow/flow/flowerrors"
 
-These deprecated operators still work but add unnecessary pipeline stages.
+// Count errors
+ctx, errorCounter := flowerrors.WithErrorCounter[int](ctx, nil)
 
-## When to Use
+// Collect all errors
+ctx, collector := flowerrors.WithErrorCollector[int](ctx)
+// Later: collector.Errors()
 
-| Approach                  | Use Case                                |
-| ------------------------- | --------------------------------------- |
-| `OnValue`, `OnError`      | Simple callbacks for logging/metrics    |
-| `WithCounter`             | Counting items processed                |
-| `WithMetrics`             | Comprehensive stream statistics         |
-| `WithLogging`             | Debug logging                           |
-| Custom Interceptor        | Complex cross-cutting concerns          |
-| `MaterializeNotification` | Testing, serialization (not deprecated) |
+// Monitor error rate with circuit breaker pattern
+ctx = flowerrors.WithCircuitBreakerMonitor[int](ctx, 5, func() {
+    log.Println("Error threshold exceeded!")
+})
+```
+
+## When to Use Which Hook
+
+| Hook                              | Use Case                           |
+| --------------------------------- | ---------------------------------- |
+| `WithValueHook`                   | Debug logging, custom metrics      |
+| `WithErrorHook`                   | Error logging, alerting            |
+| `WithCounter`                     | Simple throughput counting         |
+| `WithValueCounter`                | Conditional counting               |
+| `WithLogging`                     | Development debugging              |
+| `flowerrors.WithErrorCollector`   | Batch error analysis               |
+| `flowerrors.WithCircuitBreakerMonitor` | Production error rate monitoring |
+
+## Performance Considerations
+
+- Hooks add minimal overhead (function call per item)
+- Counter uses `atomic.Int64` for thread-safe counting
+- Hooks are invoked synchronously - keep callbacks fast
+- For high-throughput scenarios, consider sampling or async logging

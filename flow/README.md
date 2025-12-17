@@ -50,7 +50,7 @@ func main() {
             return n * 2, nil
         }
         return n, nil
-    }).Apply(ctx, stream)
+    }).Apply(stream)
 
     // Collect results
     results, err := flow.Slice(ctx, doubled)
@@ -146,6 +146,8 @@ result := flow.Pipe(ctx, stream,
 result := flow.Apply(ctx, stream, myTransformer)
 ```
 
+Note: `Transformer.Apply()` takes only the stream - context flows through `Stream.Emit(ctx)`.
+
 ## Terminal Operations
 
 Consume streams and produce final results. There are two styles:
@@ -165,7 +167,7 @@ err := flow.Run(ctx, stream)
 
 ### Sink Style (Composable & Parallel to Transformer)
 
-Sinks mirror Transformers: where `Transformer.Apply(ctx, stream)` produces a Stream,
+Sinks mirror Transformers: where `Transformer.Apply(stream)` produces a Stream,
 `Sink.From(ctx, stream)` produces a terminal result.
 
 ```go
@@ -175,7 +177,7 @@ first, err := flow.ToFirst[int]().From(ctx, stream)
 _, err := flow.ToRun[int]().From(ctx, stream)
 
 // Sinks implement Transformer - use Apply to get a single-element Stream
-resultStream := flow.ToSlice[int]().Apply(ctx, stream)  // Stream[[]int]
+resultStream := flow.ToSlice[int]().Apply(stream)  // Stream[[]int]
 ```
 
 ### Low-Level Result Iteration
