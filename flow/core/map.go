@@ -150,14 +150,23 @@ func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...Tr
 		go func() {
 			defer close(outChan)
 
+			// Initialize both hook systems
+			hooks := newHookInvoker[OUT](ctx)
 			dispatch := newInterceptorDispatch(ctx)
+
+			// Invoke start hooks
+			hooks.invokeStart()
 			dispatch.invokeNoArg(ctx, StreamStart)
-			defer dispatch.invokeNoArg(ctx, StreamEnd)
+
+			defer func() {
+				hooks.invokeComplete()
+				dispatch.invokeNoArg(ctx, StreamEnd)
+			}()
 
 			if cfg.CheckStrategy == CheckOnCapacity {
-				m.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize, &dispatch)
+				m.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize, hooks, &dispatch)
 			} else {
-				m.runWithEveryItemCheck(ctx, s, outChan, &dispatch)
+				m.runWithEveryItemCheck(ctx, s, outChan, hooks, &dispatch)
 			}
 		}()
 		return outChan
@@ -165,7 +174,7 @@ func (m Mapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts ...Tr
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], hooks *hookInvoker[OUT], dispatch *interceptorDispatch) {
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
@@ -183,7 +192,16 @@ func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN]
 			continue
 		}
 
-		// Dispatch based on result type
+		// Invoke new typed hooks based on result type
+		if resOut.IsValue() {
+			hooks.invokeValue(resOut.Value())
+		} else if resOut.IsError() {
+			hooks.invokeError(resOut.Error())
+		} else if resOut.IsSentinel() {
+			hooks.invokeSentinel(resOut.Error())
+		}
+
+		// Dispatch based on result type (old system)
 		dispatch.invokeResult(ctx, toAnyResult(resOut))
 
 		select {
@@ -196,7 +214,7 @@ func (m Mapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN]
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
+func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, hooks *hookInvoker[OUT], dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
 
 	for resIn := range s.Emit(ctx) {
@@ -206,6 +224,7 @@ func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN],
 		resOut, err := m(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
+			hooks.invokeError(err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
 			select {
 			case <-ctx.Done():
@@ -217,7 +236,16 @@ func (m Mapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN],
 			continue
 		}
 
-		// Dispatch based on result type
+		// Invoke new typed hooks based on result type
+		if resOut.IsValue() {
+			hooks.invokeValue(resOut.Value())
+		} else if resOut.IsError() {
+			hooks.invokeError(resOut.Error())
+		} else if resOut.IsSentinel() {
+			hooks.invokeSentinel(resOut.Error())
+		}
+
+		// Dispatch based on result type (old system)
 		dispatch.invokeResult(ctx, toAnyResult(resOut))
 
 		// Check context periodically
@@ -368,14 +396,23 @@ func (fm FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts 
 		go func() {
 			defer close(outChan)
 
+			// Initialize both hook systems
+			hooks := newHookInvoker[OUT](ctx)
 			dispatch := newInterceptorDispatch(ctx)
+
+			// Invoke start hooks
+			hooks.invokeStart()
 			dispatch.invokeNoArg(ctx, StreamStart)
-			defer dispatch.invokeNoArg(ctx, StreamEnd)
+
+			defer func() {
+				hooks.invokeComplete()
+				dispatch.invokeNoArg(ctx, StreamEnd)
+			}()
 
 			if cfg.CheckStrategy == CheckOnCapacity {
-				fm.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize, &dispatch)
+				fm.runWithCapacityCheck(ctx, s, outChan, cfg.BufferSize, hooks, &dispatch)
 			} else {
-				fm.runWithEveryItemCheck(ctx, s, outChan, &dispatch)
+				fm.runWithEveryItemCheck(ctx, s, outChan, hooks, &dispatch)
 			}
 		}()
 		return outChan
@@ -383,7 +420,7 @@ func (fm FlatMapper[IN, OUT]) ApplyWith(ctx context.Context, s Stream[IN], opts 
 }
 
 // runWithEveryItemCheck processes items checking ctx.Done() on every send.
-func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], dispatch *interceptorDispatch) {
+func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], hooks *hookInvoker[OUT], dispatch *interceptorDispatch) {
 	for resIn := range s.Emit(ctx) {
 		// Dispatch ItemReceived for the input
 		dispatch.invokeOneArg(ctx, ItemReceived, resIn)
@@ -401,7 +438,16 @@ func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Strea
 			continue
 		}
 		for _, resOut := range resOuts {
-			// Dispatch based on result type
+			// Invoke new typed hooks based on result type
+			if resOut.IsValue() {
+				hooks.invokeValue(resOut.Value())
+			} else if resOut.IsError() {
+				hooks.invokeError(resOut.Error())
+			} else if resOut.IsSentinel() {
+				hooks.invokeSentinel(resOut.Error())
+			}
+
+			// Dispatch based on result type (old system)
 			dispatch.invokeResult(ctx, toAnyResult(resOut))
 
 			select {
@@ -415,7 +461,7 @@ func (fm FlatMapper[IN, OUT]) runWithEveryItemCheck(ctx context.Context, s Strea
 }
 
 // runWithCapacityCheck processes items with batched context checks for higher throughput.
-func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, dispatch *interceptorDispatch) {
+func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream[IN], outChan chan<- Result[OUT], bufferSize int, hooks *hookInvoker[OUT], dispatch *interceptorDispatch) {
 	itemsSinceCheck := 0
 
 	for resIn := range s.Emit(ctx) {
@@ -425,8 +471,9 @@ func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream
 		resOuts, err := fm(resIn)
 		if err != nil {
 			errResult := Err[OUT](err)
+			hooks.invokeError(err)
 			dispatch.invokeOneArg(ctx, ErrorOccurred, err)
-			select {
+			select{
 			case <-ctx.Done():
 				return
 			case outChan <- errResult:
@@ -437,7 +484,16 @@ func (fm FlatMapper[IN, OUT]) runWithCapacityCheck(ctx context.Context, s Stream
 		}
 
 		for _, resOut := range resOuts {
-			// Dispatch based on result type
+			// Invoke new typed hooks based on result type
+			if resOut.IsValue() {
+				hooks.invokeValue(resOut.Value())
+			} else if resOut.IsError() {
+				hooks.invokeError(resOut.Error())
+			} else if resOut.IsSentinel() {
+				hooks.invokeSentinel(resOut.Error())
+			}
+
+			// Dispatch based on result type (old system)
 			dispatch.invokeResult(ctx, toAnyResult(resOut))
 
 			// Check context periodically
