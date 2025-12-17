@@ -61,7 +61,7 @@ func BenchmarkHooks_3Hooks(b *testing.B) {
 		testCtx = observe.WithValueHook(testCtx, func(int) {})
 
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(testCtx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
@@ -84,7 +84,7 @@ func BenchmarkHooks_FullHooksStruct(b *testing.B) {
 		})
 
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(testCtx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
@@ -105,7 +105,7 @@ func BenchmarkHooks_5Hooks(b *testing.B) {
 		testCtx = observe.WithValueHook(testCtx, func(int) {})
 
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(testCtx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
@@ -121,7 +121,7 @@ func BenchmarkHooks_PerItem_Baseline(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(ctx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(ctx, mapped)
 	}
 }
@@ -133,7 +133,7 @@ func BenchmarkHooks_PerItem_WithCounter(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testCtx, _ := observe.WithCounter[int](ctx)
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(testCtx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
@@ -145,7 +145,7 @@ func BenchmarkHooks_PerItem_WithLogging(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testCtx := observe.WithLogging[int](ctx, func(string, ...any) {})
 		stream := flow.FromSlice(data)
-		mapped := core.Map(squareWithErr).Apply(testCtx, stream)
+		mapped := core.Map(squareWithErr).Apply(stream)
 		_, _ = core.Slice(testCtx, mapped)
 	}
 }
@@ -161,7 +161,7 @@ func BenchmarkHooks_InterceptBuffered16(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testCtx, _ := observe.WithCounter[int](ctx)
 		stream := flow.FromSlice(data)
-		intercepted := core.InterceptBuffered[int](16).Apply(testCtx, stream)
+		intercepted := core.InterceptBuffered[int](16).Apply(stream)
 		_, _ = core.Slice(testCtx, intercepted)
 	}
 }
@@ -173,7 +173,7 @@ func BenchmarkHooks_InterceptBuffered64(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testCtx, _ := observe.WithCounter[int](ctx)
 		stream := flow.FromSlice(data)
-		intercepted := core.InterceptBuffered[int](64).Apply(testCtx, stream)
+		intercepted := core.InterceptBuffered[int](64).Apply(stream)
 		_, _ = core.Slice(testCtx, intercepted)
 	}
 }
@@ -185,7 +185,7 @@ func BenchmarkHooks_InterceptBuffered256(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testCtx, _ := observe.WithCounter[int](ctx)
 		stream := flow.FromSlice(data)
-		intercepted := core.InterceptBuffered[int](256).Apply(testCtx, stream)
+		intercepted := core.InterceptBuffered[int](256).Apply(stream)
 		_, _ = core.Slice(testCtx, intercepted)
 	}
 }
