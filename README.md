@@ -406,9 +406,70 @@ make run EXAMPLE=basic
 - **[Examples](examples/)** - Working examples for common use cases
 - **[Benchmarks](docs/BENCHMARKS.md)** - Performance analysis
 
-## Project Status
+## Project Status & Stability
 
-**ALPHA** - This project is under active development with no backward compatibility guarantees. Breaking changes are expected as the API evolves toward a stable release.
+**ALPHA** – No users yet. Backward compatibility is not guaranteed. Expect rapid iteration and breaking changes. Go version: **1.23+**.
+
+## Quality & CI (recommended gates)
+
+Run these locally and in CI before merging:
+
+- `go vet ./...`
+- `staticcheck ./...`
+- `go test ./... -count=1`
+- `go test ./... -race -short`
+- (targeted fuzz) `go test ./flow/... -run=Fuzz -fuzz=.`
+- Bench smoke: `go test ./... -run TestBuffer_ContextCancellation -count=5` (timing flake detector)
+
+## Performance & Soak Guidance
+
+Targets (define per deployment):
+
+- Throughput: <TBD> items/sec
+- Latency: <TBD> p99 end-to-end
+- Allocations: <TBD> allocs/op, <TBD> B/op (steady-state)
+
+Benchmarks exist under `benchmarks/` and `flow/**/` tests. For confidence:
+
+- Throughput/allocs: `go test ./benchmarks -bench=. -benchmem`
+- Concurrency & cancellation: soak with slow consumers + `context.WithTimeout`
+- Backpressure: exercise buffered vs unbuffered channels in timing/aggregate paths
+- GC pressure: run benchmarks with `GODEBUG=gctrace=1` and inspect pauses/p99
+
+Scenarios to cover:
+
+- Fast producer + slow consumer (backpressure)
+- Context cancellation mid-stream
+- Panic in mapper/flatmapper (recovery to Err)
+- Buffered vs unbuffered channels
+- Bursty input vs steady input
+
+### Soak & Observability Quick Runs
+
+- Soak harness: `go test ./flow -run TestSoak_ -count=1 -timeout=2s`
+- Buffer cancel smoke: `go test ./flow/timing -run TestBuffer_ContextCancellation -count=3`
+- Otel hooks sample (noop meter by default): `go test ./flow/observe -run TestOtelHooksIntegration -count=1`
+
+Swap the noop meter in `flow/observe/otel_example_test.go` with your `sdk/metric` provider to emit real metrics; hooks fire synchronously, so keep callbacks lightweight.
+
+## Observability Defaults (typed hooks)
+
+Use hooks rather than interceptors:
+
+```go
+ctx := context.Background()
+ctx, counter := observe.WithCounter[int](ctx)
+ctx = observe.WithLogging[int](ctx, log.Printf)
+ctx, errs := flowerrors.WithErrorCollector[int](ctx)
+
+stream := flow.Map(func(n int) (int, error) { return n * 2, nil }).Apply(flow.FromSlice([]int{1,2,3}))
+_, _ = flow.Slice(ctx, stream)
+
+fmt.Println("count", counter.Load())
+fmt.Println("errors", errs.Errors())
+```
+
+For OpenTelemetry/Prometheus, wrap hooks to emit metrics/logs inside the callbacks; hooks run synchronously, so keep callbacks fast.
 
 ## License
 

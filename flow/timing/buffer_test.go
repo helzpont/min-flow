@@ -72,7 +72,7 @@ func TestDebounce(t *testing.T) {
 	})
 
 	// Debounce with a 20ms window - Debounce is a Transformer
-	debounced := timing.Debounce[int](20*time.Millisecond).Apply(stream)
+	debounced := timing.Debounce[int](20 * time.Millisecond).Apply(stream)
 
 	startTime := time.Now()
 	result, err := flow.Slice(ctx, debounced)
@@ -107,7 +107,7 @@ func TestThrottle(t *testing.T) {
 	})
 
 	// Throttle to one item per 10ms - Throttle is a Transformer
-	throttled := timing.Throttle[int](10*time.Millisecond).Apply(stream)
+	throttled := timing.Throttle[int](10 * time.Millisecond).Apply(stream)
 
 	result, err := flow.Slice(ctx, throttled)
 
@@ -135,7 +135,7 @@ func TestThrottleLatest(t *testing.T) {
 	})
 
 	// ThrottleLatest is a Transformer
-	throttled := timing.ThrottleLatest[int](10*time.Millisecond).Apply(stream)
+	throttled := timing.ThrottleLatest[int](10 * time.Millisecond).Apply(stream)
 
 	result, err := flow.Slice(ctx, throttled)
 	if err != nil {
@@ -181,7 +181,7 @@ func TestDelay(t *testing.T) {
 	stream := flow.FromSlice([]int{1, 2, 3})
 
 	// Delay is a Transformer
-	delayed := timing.Delay[int](20*time.Millisecond).Apply(stream)
+	delayed := timing.Delay[int](20 * time.Millisecond).Apply(stream)
 
 	startTime := time.Now()
 	result, err := flow.Slice(ctx, delayed)
@@ -217,7 +217,7 @@ func TestSample(t *testing.T) {
 	})
 
 	// Sample every 30ms - Sample is a Transformer
-	sampled := timing.Sample[int](30*time.Millisecond).Apply(stream)
+	sampled := timing.Sample[int](30 * time.Millisecond).Apply(stream)
 
 	result, err := flow.Slice(ctx, sampled)
 	if err != nil {
@@ -291,7 +291,24 @@ func TestBuffer_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	stream := flow.FromSlice([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	// Context-aware source so cancellation stops production quickly.
+	stream := flow.Emit(func(ctx context.Context) <-chan flow.Result[int] {
+		out := make(chan flow.Result[int])
+		go func() {
+			defer close(out)
+			i := 0
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case out <- flow.Ok(i):
+					i++
+				}
+			}
+		}()
+		return out
+	})
+
 	buffered := timing.Buffer[int](2).Apply(stream)
 
 	count := 0
