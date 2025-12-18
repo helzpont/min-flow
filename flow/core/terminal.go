@@ -19,6 +19,15 @@ func (s Sink[IN, OUT]) From(ctx context.Context, stream Stream[IN]) (OUT, error)
 	return s(ctx, stream)
 }
 
+// Defer returns a thunk that invokes the sink later. This keeps stream definition
+// separate from execution, enabling lazy evaluation without losing stream-level
+// behaviors (hooks, cancellation propagation, registry lookup).
+func (s Sink[IN, OUT]) Defer(stream Stream[IN]) func(context.Context) (OUT, error) {
+	return func(ctx context.Context) (OUT, error) {
+		return s(ctx, stream)
+	}
+}
+
 // Apply implements Transformer, producing a single-element Stream containing the result.
 // This allows Sinks to be composed with other Transformers in a pipeline.
 func (s Sink[IN, OUT]) Apply(stream Stream[IN]) Stream[OUT] {

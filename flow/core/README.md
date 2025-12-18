@@ -4,39 +4,112 @@ The `core` package provides the foundational abstractions for min-flow's stream 
 
 ## Architecture
 
-The core package implements a layered abstraction model:
+The core package implements a layered abstraction model with three tiers.
+
+### Abstraction Layers (Horizontal View)
+
+Each layer answers a different question about data flow:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  HIGH LEVEL (Interfaces)                                                    │
+│  "What is the pipeline shape?"                                              │
+│                                                                             │
+│    Stream[T]  ──────────────►  Transformer[IN,OUT]  ──────────►  (output)   │
+│    (source)                    (processing)                      (result)   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  MID LEVEL (Function Types)                                                 │
+│  "How do channels flow?"                                                    │
+│                                                                             │
+│    Emitter[T]  ─────►  Transmitter[IN,OUT]  ─────►  Sink[IN,OUT]            │
+│    (produces)          (transforms)                 (consumes)              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LOW LEVEL (Pure Functions)                                                 │
+│  "What happens to each item?"                                               │
+│                                                                             │
+│    Mapper[IN,OUT]  ────────────►  FlatMapper[IN,OUT]                        │
+│    (1:1 transform)                (1:N transform)                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Correspondence (Vertical View)
+
+Components at each layer serve parallel roles:
+
+```
+              SOURCE              TRANSFORM             TERMINAL
+           ─────────────────   ─────────────────   ─────────────────
+ HIGH      │   Stream[T]   │   │ Transformer │   │               │
+ (iface)   │   interface   │   │  interface  │   │   (n/a)       │
+           ─────────────────   ─────────────────   ─────────────────
+                  │                   │                   │
+                  ▼                   ▼                   ▼
+           ─────────────────   ─────────────────   ─────────────────
+ MID       │  Emitter[T]  │   │ Transmitter │   │  Sink[IN,OUT] │
+ (func)    │  func type   │   │  func type  │   │   func type   │
+           ─────────────────   ─────────────────   ─────────────────
+                  │                   │                   │
+                  ▼                   ▼                   ▼
+           ─────────────────   ─────────────────   ─────────────────
+ LOW       │              │   │   Mapper    │   │               │
+ (pure)    │   (n/a)      │   │ FlatMapper  │   │   (n/a)       │
+           ─────────────────   ─────────────────   ─────────────────
+                  │                   │                   │
+                  └───────────────────┼───────────────────┘
+                                      ▼
+                            ─────────────────────
+                            │   Result[T]       │
+                            │ Ok | Err | Sentinel│
+                            ─────────────────────
+```
+
+### Data Flow Through Pipeline
+
+```mermaid
+flowchart LR
+    subgraph Source
+        E[Emitter] -->|chan Result| C1((channel))
+    end
+
+    subgraph Transform
+        C1 --> T[Transmitter/Mapper]
+        T -->|chan Result| C2((channel))
+    end
+
+    subgraph Terminal
+        C2 --> S[Sink]
+        S -->|OUT, error| R[Result]
+    end
+```
+
+### Implements Relationship
 
 ```mermaid
 graph TB
-    subgraph "High Level"
+    subgraph Interfaces
         Stream["Stream[T]"]
-        Transformer["Transformer[IN, OUT]"]
+        Transformer["Transformer[IN,OUT]"]
     end
 
-    subgraph "Mid Level"
+    subgraph "Function Types"
         Emitter["Emitter[T]"]
-        Transmitter["Transmitter[IN, OUT]"]
-        Sink["Sink[IN, OUT]"]
+        Transmitter["Transmitter[IN,OUT]"]
+        Mapper["Mapper[IN,OUT]"]
+        FlatMapper["FlatMapper[IN,OUT]"]
+        Sink["Sink[IN,OUT]"]
     end
 
-    subgraph "Low Level"
-        Mapper["Mapper[IN, OUT]"]
-        FlatMapper["FlatMapper[IN, OUT]"]
-    end
-
-    subgraph "Data"
-        Result["Result[T]"]
-    end
-
-    Stream --> Emitter
-    Transformer --> Transmitter
-    Transformer --> Sink
-    Emitter --> Result
-    Transmitter --> Mapper
-    Transmitter --> FlatMapper
-    Sink --> Result
-    Mapper --> Result
-    FlatMapper --> Result
+    Emitter -.->|implements| Stream
+    Transmitter -.->|implements| Transformer
+    Mapper -.->|implements| Transformer
+    FlatMapper -.->|implements| Transformer
+    Sink -.->|implements| Transformer
 ```
 
 ## Core Types
@@ -88,10 +161,10 @@ A `Transformer` converts one stream type to another. `Transmitter` is its functi
 ```go
 // Transformer interface
 type Transformer[IN, OUT any] interface {
-    Apply(context.Context, Stream[IN]) Stream[OUT]
+    Apply(Stream[IN]) Stream[OUT]
 }
 
-// Transmitter implements Transformer
+// Transmitter implements Transformer via Apply(stream)
 double := core.Transmit(func(ctx context.Context, in <-chan Result[int]) <-chan Result[int] {
     out := make(chan Result[int])
     go func() {
@@ -104,6 +177,9 @@ double := core.Transmit(func(ctx context.Context, in <-chan Result[int]) <-chan 
     }()
     return out
 })
+
+// Apply takes only stream; context comes from Emit(ctx)
+result := double.Apply(stream)
 ```
 
 ### Mapper[IN, OUT] / FlatMapper[IN, OUT]
@@ -122,59 +198,81 @@ expand := core.FlatMap(func(n int) ([]int, error) {
 })
 ```
 
-## Delegate System
+## Typed Hooks System
 
-The delegate system provides extensibility through registered components:
+Hooks provide type-safe observation of stream events without modifying the stream.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     context.Context                             │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                   Hooks[T]                                │  │
+│  │  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌──────────────┐   │  │
+│  │  │OnStart  │ │OnValue  │ │OnError   │ │OnComplete    │   │  │
+│  │  │func()   │ │func(T)  │ │func(err) │ │func()        │   │  │
+│  │  └─────────┘ └─────────┘ └──────────┘ └──────────────┘   │  │
+│  │                          ┌──────────┐                     │  │
+│  │                          │OnSentinel│                     │  │
+│  │                          │func(err) │                     │  │
+│  │                          └──────────┘                     │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Hooks Structure
+
+```go
+type Hooks[T any] struct {
+    OnStart    func()           // Stream begins processing
+    OnValue    func(T)          // Successful value emitted
+    OnError    func(error)      // Error result emitted
+    OnSentinel func(error)      // Sentinel emitted
+    OnComplete func()           // Stream finished
+}
+```
+
+### Attaching Hooks
+
+```go
+// Attach hooks to context
+ctx = core.WithHooks(ctx, core.Hooks[int]{
+    OnStart:    func() { log.Println("started") },
+    OnValue:    func(v int) { log.Printf("value: %d", v) },
+    OnError:    func(err error) { log.Printf("error: %v", err) },
+    OnComplete: func() { log.Println("done") },
+})
+
+// Hooks fire automatically during Emit(ctx)
+for res := range stream.Emit(ctx) { ... }
+```
+
+### Hook Invocation Flow
 
 ```mermaid
-graph LR
-    Context[context.Context] --> Registry
-    Registry --> Interceptor
-    Registry --> Factory
-    Registry --> Pool
-    Registry --> Config
+sequenceDiagram
+    participant User
+    participant Stream
+    participant Hooks
 
-    Interceptor --> Events[Stream Events]
-    Factory --> Instances[Create Instances]
-    Pool --> Resources[Manage Resources]
-    Config --> Settings[Configuration]
-```
-
-### Registry
-
-Thread-safe storage for delegates, propagated via context:
-
-```go
-ctx, registry := core.WithRegistry(context.Background())
-registry.Register(myInterceptor)
-registry.Register(myConfig)
-```
-
-### Interceptor
-
-Event handlers for observability:
-
-```go
-type Interceptor interface {
-    Delegate
-    Events() []Event       // Which events to handle
-    Do(context.Context, Event, ...any) error
-}
-
-// Available events
-StreamStart      // Stream begins
-StreamEnd        // Stream completes
-ItemReceived     // Any item received
-ValueReceived    // Successful value received
-ErrorOccurred    // Error result received
-SentinelReceived // Sentinel received
-ItemEmitted      // Item sent downstream
+    User->>Stream: Emit(ctx)
+    Stream->>Hooks: OnStart()
+    loop For each item
+        alt Value
+            Stream->>Hooks: OnValue(v)
+        else Error
+            Stream->>Hooks: OnError(err)
+        else Sentinel
+            Stream->>Hooks: OnSentinel(err)
+        end
+        Stream->>User: Result[T]
+    end
+    Stream->>Hooks: OnComplete()
 ```
 
 ## Terminal Operations
 
 Sinks consume streams and produce final results. They mirror the Transformer pattern:
-where `Transformer.Apply(ctx, stream)` produces a Stream, `Sink.From(ctx, stream)` produces a result.
+where `Transformer.Apply(stream)` produces a Stream, `Sink.From(ctx, stream)` produces a result.
 
 ### Sink[IN, OUT]
 
@@ -184,13 +282,34 @@ A function type that implements both terminal consumption and Transformer:
 // Sink type
 type Sink[IN, OUT any] func(context.Context, Stream[IN]) (OUT, error)
 
-// From: consume stream and return result (mirrors Apply)
+// From: consume stream and return result (primary method)
 values, err := core.ToSlice[int]().From(ctx, stream)
 first, err := core.ToFirst[int]().From(ctx, stream)
 _, err := core.ToRun[int]().From(ctx, stream)
 
+// Defer: lazy evaluation - returns a thunk to call later
+thunk := core.ToSlice[int]().Defer(stream)
+// ... define more of the pipeline ...
+values, err := thunk(ctx)  // Execute when ready
+
 // Apply: Sinks implement Transformer, producing single-element streams
-resultStream := core.ToSlice[int]().Apply(ctx, stream)  // Stream[[]int]
+resultStream := core.ToSlice[int]().Apply(stream)  // Stream[[]int]
+```
+
+### Sink Lifecycle
+
+```
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│   Define     │      │    Defer     │      │   Execute    │
+│   Sink       │─────►│   (lazy)     │─────►│   thunk(ctx) │
+│              │      │              │      │              │
+└──────────────┘      └──────────────┘      └──────────────┘
+       │                                            │
+       │              ┌──────────────┐              │
+       └─────────────►│    From      │◄─────────────┘
+                      │   (eager)    │
+                      │              │
+                      └──────────────┘
 ```
 
 ### Built-in Sinks
@@ -219,11 +338,23 @@ Combine multiple mappers to eliminate intermediate channels:
 
 ```go
 // Without fusion: 3 goroutines, 3 channels
-stream.Apply(ctx, mapper1).Apply(ctx, mapper2).Apply(ctx, mapper3)
+mapper1.Apply(mapper2.Apply(mapper3.Apply(stream)))
 
 // With fusion: 1 goroutine, 1 channel
 fused := core.Fuse(core.Fuse(mapper1, mapper2), mapper3)
-stream.Apply(ctx, fused)
+fused.Apply(stream)
+```
+
+```
+Without Fusion                    With Fusion
+─────────────────                 ─────────────────
+┌──────┐   ┌──────┐   ┌──────┐   ┌────────────────┐
+│  M1  │──►│  M2  │──►│  M3  │   │ Fuse(M1,M2,M3) │
+└──────┘   └──────┘   └──────┘   └────────────────┘
+   │          │          │              │
+  chan       chan       chan          chan
+  goroutine  goroutine  goroutine    goroutine
+   (3)        (3)        (3)          (1)
 ```
 
 ### Buffered Channels

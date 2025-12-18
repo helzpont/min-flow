@@ -1,6 +1,6 @@
 # min-flow MVP
 
-A lightweight stream processing framework for Go with built-in observability via interceptors. Build composable, observable data pipelines with a fluent API.
+A lightweight stream processing framework for Go with built-in observability via typed hooks. Build composable, observable data pipelines with a fluent API.
 
 [![Go Version](https://img.shields.io/badge/go-%3E%3D1.23-blue)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -10,8 +10,8 @@ A lightweight stream processing framework for Go with built-in observability via
 - **Type-Safe Streams**: Fully generic streams with compile-time type checking
 - **Composable Transformers**: Chain operations naturally with a fluent API
 - **Error Handling**: Built-in `Result[T]` type distinguishes between values, errors, and sentinels
-- **Interceptor System**: Register callbacks for stream events (values, errors, start, complete)
-- **Observable**: Built-in metrics, logging, and error collection via interceptors
+- **Typed Hooks**: Register type-safe callbacks for stream events (values, errors, start, complete)
+- **Observable**: Built-in metrics, logging, and error collection via typed hooks
 - **Zero Dependencies**: Core package uses only the standard library
 
 ## Installation
@@ -43,7 +43,7 @@ func main() {
     // Double each value
     doubled := flow.Map(func(n int) (int, error) {
         return n * 2, nil
-    }).Apply(ctx, stream)
+    }).Apply(stream)
 
     // Collect results
     values, err := flow.Slice(ctx, doubled)
@@ -66,7 +66,7 @@ flow/
 │   ├── map.go          # Mapper and FlatMapper
 │   ├── terminal.go     # Sink type and terminal operations
 │   ├── delegate.go     # Delegate system and Registry
-│   └── dispatch.go     # Interceptor dispatch mechanism
+│   └── hooks.go        # Typed hooks system
 ├── types.go        # Type aliases and constructors
 ├── source.go       # Stream sources (FromSlice, Range, etc.)
 ├── compose.go      # Pipeline composition (Pipe, Chain, Through)
@@ -130,7 +130,7 @@ Transformers convert streams from one type to another:
 // Apply a single transformer
 doubled := flow.Map(func(n int) (int, error) {
     return n * 2, nil
-}).Apply(ctx, stream)
+}).Apply(stream)
 
 // Chain multiple transformers of the same type
 result := flow.Pipe(ctx, stream,
@@ -163,107 +163,94 @@ fused := flow.Fuse(mapper1, mapper2)
 fusedFlat := flow.FuseFlat(flatMapper1, flatMapper2)
 ```
 
-## Interceptor System
+## Typed Hooks System
 
-Interceptors provide a powerful way to observe stream events without modifying the stream itself. Register callbacks that are automatically invoked as items flow through transformers.
+Typed hooks provide a powerful way to observe stream events without modifying the stream itself. Register type-safe callbacks that are automatically invoked as items flow through transformers.
 
-### Setting Up Interceptors
+### Setting Up Hooks
 
 ```go
-// Create a context with a registry
-ctx, registry := flow.WithRegistry(context.Background())
+ctx := context.Background()
 
-// Register interceptors
-observe.OnValue[int](registry, func(value int) {
+// Attach typed hooks to context
+ctx = observe.WithValueHook[int](ctx, func(value int) {
     fmt.Printf("Received value: %d\n", value)
 })
 
-observe.OnError[int](registry, func(err error) {
+ctx = observe.WithErrorHook[int](ctx, func(err error) {
     log.Printf("Error occurred: %v", err)
 })
 
-observe.OnStart(registry, func() {
+ctx = observe.WithStartHook[int](ctx, func() {
     fmt.Println("Stream started")
 })
 
-observe.OnComplete(registry, func() {
+ctx = observe.WithCompleteHook[int](ctx, func() {
     fmt.Println("Stream completed")
 })
 
-// Use the context - interceptors are automatically invoked
+// Use the context - hooks are automatically invoked during Emit()
 stream := flow.FromSlice([]int{1, 2, 3})
 doubled := flow.Map(func(n int) (int, error) {
     return n * 2, nil
-}).Apply(ctx, stream)
+}).Apply(stream)
 
 values, _ := flow.Slice(ctx, doubled)
 ```
 
-### Built-in Interceptors
+### Built-in Hook Helpers
 
 #### Observability (`flow/observe`)
 
 ```go
 // Value/Error callbacks
-observe.OnValue[T](registry, func(value T) { ... })
-observe.OnError[T](registry, func(err error) { ... })
+ctx = observe.WithValueHook[T](ctx, func(value T) { ... })
+ctx = observe.WithErrorHook[T](ctx, func(err error) { ... })
 
 // Lifecycle callbacks
-observe.OnStart(registry, func() { ... })
-observe.OnComplete(registry, func() { ... })
+ctx = observe.WithStartHook[T](ctx, func() { ... })
+ctx = observe.WithCompleteHook[T](ctx, func() { ... })
+ctx = observe.WithSentinelHook[T](ctx, func(err error) { ... })
 
-// Metrics collection
-var metrics observe.StreamMetrics
-observe.WithMetrics(registry, &metrics)
-// After stream completes: metrics.ValueCount(), metrics.ErrorCount(), metrics.Duration()
+// Counting (returns context and counter)
+ctx, counter := observe.WithCounter[T](ctx)
+// After stream: counter.Values(), counter.Errors(), counter.Total()
 
-// Live metrics (updated in real-time)
-var live observe.LiveMetrics
-observe.WithLiveMetrics(registry, &live)
-// During processing: live.ValueCount(), live.ErrorCount(), live.Rate()
+ctx, valueCounter := observe.WithValueCounter[T](ctx)
+// After stream: valueCounter.Count()
 
-// Counting
-var count int64
-observe.WithCounter(registry, &count)        // Count all items
-observe.WithValueCounter(registry, &count)   // Count values only
+// Error collection
+ctx, errCollector := observe.WithErrorCollector[T](ctx)
+// After stream: errCollector.Errors(), errCollector.HasErrors()
 
 // Logging
-observe.WithLogging(registry, logger, "pipeline")
-
-// Error collection
-var errors []error
-observe.WithErrorCollector(registry, &errors)
+ctx = observe.WithLogging[T](ctx, log.Printf)
 ```
 
-#### Error Interceptors (`flow/flowerrors`)
+#### Low-level Hooks (`flow/core`)
 
 ```go
-// Error callbacks
-flowerrors.OnErrorDo(registry, func(err error) {
-    log.Printf("Error: %v", err)
+// Full hooks structure for complete control
+ctx = core.WithHooks(ctx, core.Hooks[int]{
+    OnStart:    func() { ... },
+    OnValue:    func(v int) { ... },
+    OnError:    func(err error) { ... },
+    OnSentinel: func(err error) { ... },
+    OnComplete: func() { ... },
 })
-
-// Error counting
-var errorCount int64
-flowerrors.WithErrorCounter(registry, &errorCount)
-
-// Error collection
-var errors []error
-flowerrors.WithErrorCollector(registry, &errors)
-
-// Circuit breaker monitoring
-cb := flowerrors.NewCircuitBreaker(config)
-flowerrors.WithCircuitBreakerMonitor(registry, cb)
 ```
 
-### Multiple Callbacks
+### Hook Composition
 
-You can register multiple callbacks for the same event:
+Multiple hooks of different types can coexist:
 
 ```go
-// Both callbacks will be invoked for each value
-observe.OnValue[int](registry, func(v int) { fmt.Println("First:", v) })
-observe.OnValue[int](registry, func(v int) { fmt.Println("Second:", v) })
+ctx := context.Background()
+ctx, intCounter := observe.WithCounter[int](ctx)
+ctx, strCounter := observe.WithCounter[string](ctx)
+ctx, errCollector := observe.WithErrorCollector[int](ctx)
+
+// All hooks fire during their respective stream processing
 ```
 
 ## Error Handling
@@ -341,7 +328,7 @@ for result := range flow.All(ctx, stream) {
 
 ### Sink Type
 
-Sinks can also be composed in pipelines:
+Sinks consume streams and produce terminal results:
 
 ```go
 // Create sinks
@@ -349,11 +336,16 @@ toSlice := flow.ToSlice[int]()
 toFirst := flow.ToFirst[int]()
 toRun := flow.ToRun[int]()
 
-// Use directly
+// Use directly (primary method)
 values, err := toSlice.From(ctx, stream)
 
-// Or compose in a pipeline (wraps result in single-element stream)
-resultStream := toSlice.Apply(ctx, stream)
+// Lazy evaluation with Defer - returns a thunk you call later
+thunk := toSlice.Defer(stream)
+// ... define more pipeline ...
+values, err := thunk(ctx)  // Execute when ready
+
+// Compose in a pipeline (wraps result in single-element stream)
+resultStream := toSlice.Apply(stream)
 ```
 
 ## Composition
@@ -380,7 +372,7 @@ combined := flow.Chain(
     mapper2,
     mapper3,
 )
-result := combined.Apply(ctx, stream)
+result := combined.Apply(stream)
 ```
 
 ### Through
@@ -393,7 +385,7 @@ composed := flow.Through(
     flow.Map(strconv.Itoa),
     flow.Map(func(s string) ([]byte, error) { return []byte(s), nil }),
 )
-result := composed.Apply(ctx, intStream)
+result := composed.Apply(intStream)
 ```
 
 ## Roadmap
@@ -437,7 +429,7 @@ This MVP provides the foundation for stream processing with interceptors. Future
 1. **Viability First**: Robust and reliable stream processing users can trust
 2. **Developer Experience**: Clear APIs, helpful errors, progressive learning curve
 3. **Go Idiomatic**: Leverage Go's concurrency primitives (channels, goroutines)
-4. **Extensibility**: Delegate/Interceptor system for customization
+4. **Extensibility**: Typed hooks system for observation and customization
 5. **Performance**: Efficient by default, with optimization options (Fuse, buffering)
 
 ## Contributing
