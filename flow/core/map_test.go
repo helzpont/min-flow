@@ -46,54 +46,6 @@ func TestTransformConfig(t *testing.T) {
 	}
 }
 
-func TestTransformConfig_Delegate(t *testing.T) {
-	cfg := &TransformConfig{BufferSize: 64}
-
-	// Test Init
-	if err := cfg.Init(); err != nil {
-		t.Errorf("Init() error = %v, want nil", err)
-	}
-
-	// Test Close
-	if err := cfg.Close(); err != nil {
-		t.Errorf("Close() error = %v, want nil", err)
-	}
-}
-
-func TestTransformConfig_Validate(t *testing.T) {
-	tests := []struct {
-		name       string
-		bufferSize int
-		wantErr    bool
-	}{
-		{
-			name:       "valid zero",
-			bufferSize: 0,
-			wantErr:    false,
-		},
-		{
-			name:       "valid positive",
-			bufferSize: 64,
-			wantErr:    false,
-		},
-		{
-			name:       "invalid negative",
-			bufferSize: -1,
-			wantErr:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &TransformConfig{BufferSize: tt.bufferSize}
-			err := cfg.Validate()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestTransformConfig_FromContext(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -125,10 +77,7 @@ func TestTransformConfig_FromContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			if tt.ctxBufferSize >= 0 {
-				var registry *Registry
-				ctx, registry = WithRegistry(ctx)
-				cfg := &TransformConfig{BufferSize: tt.ctxBufferSize}
-				_ = registry.Register(cfg)
+				ctx = WithConfig(ctx, &TransformConfig{BufferSize: tt.ctxBufferSize})
 			}
 
 			result := applyOptions(ctx, tt.opts...)

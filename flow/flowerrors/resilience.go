@@ -3,7 +3,6 @@ package flowerrors
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -24,24 +23,9 @@ const DefaultMaxRetries = 3
 const DefaultRetryDelay = 100 * time.Millisecond
 
 // RetryConfig holds configuration for retry operations.
-// It implements the core.Config interface for context-level configuration.
 type RetryConfig struct {
 	MaxRetries int
 	Backoff    BackoffStrategy
-}
-
-// Init initializes the RetryConfig.
-func (c *RetryConfig) Init() error { return nil }
-
-// Close cleans up the RetryConfig.
-func (c *RetryConfig) Close() error { return nil }
-
-// Validate ensures the RetryConfig has valid values.
-func (c *RetryConfig) Validate() error {
-	if c.MaxRetries < 0 {
-		return fmt.Errorf("max retries must be non-negative, got %d", c.MaxRetries)
-	}
-	return nil
 }
 
 // getRetryConfig returns retry configuration from context or defaults.

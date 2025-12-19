@@ -2,7 +2,6 @@ package timing
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -10,31 +9,10 @@ import (
 )
 
 // TimingConfig provides configuration for timing transformers.
-// It can be registered as a delegate to provide default buffer sizes
-// that can be overridden by function parameters.
 type TimingConfig struct {
 	// BufferSize specifies the default buffer size for buffering operations.
 	// A value of 0 or negative will use the function-level default (1).
 	BufferSize int
-}
-
-// Init implements the core.Delegate interface.
-func (c *TimingConfig) Init() error {
-	return nil
-}
-
-// Close implements the core.Delegate interface.
-func (c *TimingConfig) Close() error {
-	return nil
-}
-
-// Validate implements the core.Config interface.
-// It returns an error if the configuration is invalid.
-func (c *TimingConfig) Validate() error {
-	if c.BufferSize < 0 {
-		return fmt.Errorf("timing config: buffer size must be >= 0, got %d", c.BufferSize)
-	}
-	return nil
 }
 
 // WithBufferSize returns a functional option that sets the buffer size.

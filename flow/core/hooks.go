@@ -1,8 +1,6 @@
 package core
 
-import (
-	"context"
-)
+import "context"
 
 // Hooks holds typed observation callbacks for a stream.
 // All fields are optional - nil means no observation for that event.

@@ -237,66 +237,23 @@ func BenchmarkHooks_Compose_3Hooks(b *testing.B) {
 }
 
 // =============================================================================
-// Event matching overhead (kept for reference, still used by Registry)
+// Config operations
 // =============================================================================
 
-func BenchmarkEvent_Matching_Exact(b *testing.B) {
-	event := core.ItemReceived
-	pattern := "item:received"
+func BenchmarkConfig_WithConfig(b *testing.B) {
+	cfg := &core.TransformConfig{BufferSize: 64}
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_ = event.Matches(pattern)
+		_ = core.WithConfig(ctx, cfg)
 	}
 }
 
-func BenchmarkEvent_Matching_WildcardSuffix(b *testing.B) {
-	event := core.StreamStart
-	pattern := "stream:*"
+func BenchmarkConfig_GetConfig(b *testing.B) {
+	testCtx := core.WithConfig(ctx, &core.TransformConfig{BufferSize: 64})
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_ = event.Matches(pattern)
-	}
-}
-
-func BenchmarkEvent_Matching_WildcardPrefix(b *testing.B) {
-	event := core.StreamStart
-	pattern := "*:start"
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_ = event.Matches(pattern)
-	}
-}
-
-func BenchmarkEvent_Matching_All(b *testing.B) {
-	event := core.ItemReceived
-	pattern := "*"
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_ = event.Matches(pattern)
-	}
-}
-
-// =============================================================================
-// Registry operations (still available for other delegate types)
-// =============================================================================
-
-func BenchmarkRegistry_WithRegistry(b *testing.B) {
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_, _ = core.WithRegistry(ctx)
-	}
-}
-
-func BenchmarkRegistry_GetRegistry(b *testing.B) {
-	testCtx, _ := core.WithRegistry(ctx)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_, _ = core.GetRegistry(testCtx)
+		_, _ = core.GetConfig[*core.TransformConfig](testCtx)
 	}
 }

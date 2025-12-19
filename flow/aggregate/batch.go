@@ -2,15 +2,12 @@ package aggregate
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
 // AggregateConfig provides configuration for aggregate transformers.
-// It can be registered as a delegate to provide default batch sizes
-// that can be overridden by function parameters.
 type AggregateConfig struct {
 	// BatchSize specifies the default batch size for batching operations.
 	// A value of 0 or negative will use the function-level default.
@@ -19,28 +16,6 @@ type AggregateConfig struct {
 	// BatchTimeout specifies the default timeout for BatchTimeout operations.
 	// A value of 0 or negative will use the function-level default.
 	BatchTimeout time.Duration
-}
-
-// Init implements the core.Delegate interface.
-func (c *AggregateConfig) Init() error {
-	return nil
-}
-
-// Close implements the core.Delegate interface.
-func (c *AggregateConfig) Close() error {
-	return nil
-}
-
-// Validate implements the core.Config interface.
-// It returns an error if the configuration is invalid.
-func (c *AggregateConfig) Validate() error {
-	if c.BatchSize < 0 {
-		return fmt.Errorf("aggregate config: batch size must be >= 0, got %d", c.BatchSize)
-	}
-	if c.BatchTimeout < 0 {
-		return fmt.Errorf("aggregate config: batch timeout must be >= 0, got %v", c.BatchTimeout)
-	}
-	return nil
 }
 
 // WithBatchSize returns a functional option that sets the batch size.

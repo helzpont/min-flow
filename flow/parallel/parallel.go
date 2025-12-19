@@ -2,38 +2,16 @@ package parallel
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/lguimbarda/min-flow/flow/core"
 )
 
 // ParallelConfig provides configuration for parallel transformers.
-// It can be registered as a delegate to provide default worker counts
-// that can be overridden by function parameters.
 type ParallelConfig struct {
 	// Workers specifies the default number of worker goroutines.
 	// A value of 0 or negative will use the function-level default (1 worker).
 	Workers int
-}
-
-// Init implements the core.Delegate interface.
-func (c *ParallelConfig) Init() error {
-	return nil
-}
-
-// Close implements the core.Delegate interface.
-func (c *ParallelConfig) Close() error {
-	return nil
-}
-
-// Validate implements the core.Config interface.
-// It returns an error if the configuration is invalid.
-func (c *ParallelConfig) Validate() error {
-	if c.Workers < 0 {
-		return fmt.Errorf("parallel config: workers must be >= 0, got %d", c.Workers)
-	}
-	return nil
 }
 
 // WithWorkers returns a functional option that sets the number of workers.

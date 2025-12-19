@@ -41,8 +41,6 @@ type (
 	// Sink consumes a Stream and produces a terminal result. Implements Transformer.
 	Sink[IN, OUT any] = core.Sink[IN, OUT]
 
-	Registry = core.Registry
-
 	Event = core.Event
 )
 
@@ -170,6 +168,15 @@ func Transmit[IN, OUT any](transmitter func(context.Context, <-chan Result[IN]) 
 	return core.Transmit(transmitter)
 }
 
-func WithRegistry(ctx context.Context) (context.Context, *Registry) {
-	return core.WithRegistry(ctx)
+// WithConfig attaches a configuration value to the context.
+// The config is keyed by its type, so only one instance of each config type
+// can be stored. Later calls with the same type will override earlier ones.
+func WithConfig[C any](ctx context.Context, cfg C) context.Context {
+	return core.WithConfig(ctx, cfg)
+}
+
+// GetConfig retrieves a configuration of type C from the context.
+// Returns the config and true if found, or zero value and false if not present.
+func GetConfig[C any](ctx context.Context) (C, bool) {
+	return core.GetConfig[C](ctx)
 }

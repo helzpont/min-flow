@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"iter"
 )
 
@@ -26,29 +25,9 @@ const (
 )
 
 // TransformConfig holds configuration options for transform operations.
-// It implements the Config interface, allowing it to be registered in a
-// Registry and accessed via context for stream-level configuration.
 type TransformConfig struct {
 	BufferSize    int
 	CheckStrategy ContextCheckStrategy
-}
-
-// Init initializes the TransformConfig. Currently a no-op.
-func (c *TransformConfig) Init() error {
-	return nil
-}
-
-// Close cleans up the TransformConfig. Currently a no-op.
-func (c *TransformConfig) Close() error {
-	return nil
-}
-
-// Validate ensures the TransformConfig has valid values.
-func (c *TransformConfig) Validate() error {
-	if c.BufferSize < 0 {
-		return fmt.Errorf("buffer size must be non-negative, got %d", c.BufferSize)
-	}
-	return nil
 }
 
 // TransformOption is a functional option for configuring transforms.
